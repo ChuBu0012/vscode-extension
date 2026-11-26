@@ -1,0 +1,20 @@
+# QuotaDeck & VS Code Extensions Monorepo
+
+> QuotaDeck (`pornput-s.quotadeck`) is an open-source VS Code, Cursor, Windsurf, and Antigravity extension that monitors 5-hour/weekly AI coding quotas and API credit balances across Antigravity, Claude Code, Codex, OpenRouter, DeepSeek, Cline, and custom HTTP/CLI endpoints.
+
+Canonical repository: https://github.com/ChuBu0012/vscode-extension
+Open VSX listing: https://open-vsx.org/extension/pornput-s/quotadeck
+
+## Documentation
+- [QuotaDeck Documentation](https://github.com/ChuBu0012/vscode-extension/blob/main/extensions/quotadeck/README.md): Supported providers, installation for Open VSX and Microsoft VS Code (`.vsix`), settings reference, custom endpoint schema, and FAQ.
+- [QuotaDeck Changelog](https://github.com/ChuBu0012/vscode-extension/blob/main/extensions/quotadeck/CHANGELOG.md): Version history (`0.1.0`, `0.1.1`, `0.2.0`).
+- [Full Single-File Reference](https://github.com/ChuBu0012/vscode-extension/blob/main/llms-full.txt): Consolidated technical reference for AI assistants and answer engines.
+- [Monorepo Overview](https://github.com/ChuBu0012/vscode-extension/blob/main/README.md): Workspace structure, prerequisites, Bun build, test, and VSIX packaging commands.
+
+## Architecture & Design
+- [UI Design System](https://github.com/ChuBu0012/vscode-extension/blob/main/Design.md): Minimalist Structural Grid specification, VS Code theme token mapping, and Status Bar layout rules.
+- [Extension Manifest](https://github.com/ChuBu0012/vscode-extension/blob/main/extensions/quotadeck/package.json): Exact command IDs, configuration schema, categories, and activation events.
+- [Engineering Invariants](https://github.com/ChuBu0012/vscode-extension/blob/main/AGENTS.md): Security, CSP, SecretStorage, and non-blocking execution constraints.
+
+## Optional
+- [QuotaDeck Specification](https://github.com/ChuBu0012/vscode-extension/blob/main/extensions/quotadeck/specs/spec.md): Functional requirements and provider integration decisions for v0.2.0.

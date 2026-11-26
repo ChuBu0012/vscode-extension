@@ -1,51 +1,63 @@
-# vscode-extensions
+# vscode-extension
 
-A modern Visual Studio Code extensions monorepo powered by Bun, TypeScript, and esbuild.
+A Visual Studio Code and Open VSX extensions monorepo powered by Bun, TypeScript, and esbuild.
 
-## 📁 Repository Structure
-```
+## Flagship Extension: QuotaDeck
+
+**[QuotaDeck — AI Usage & Limits](extensions/quotadeck/README.md)** (`pornput-s.quotadeck`) monitors exact 5-hour/weekly AI coding rate limits and credit balances across **Antigravity**, **Claude Code**, **Codex**, **OpenRouter**, **DeepSeek**, **Cline / ClinePass**, and user-defined HTTP/CLI endpoints directly inside the editor Status Bar and Dashboard Webview.
+
+- Registry: [Open VSX (`pornput-s/quotadeck`)](https://open-vsx.org/extension/pornput-s/quotadeck)
+- Extension Docs: [extensions/quotadeck/README.md](extensions/quotadeck/README.md)
+- Changelog: [extensions/quotadeck/CHANGELOG.md](extensions/quotadeck/CHANGELOG.md)
+- AI / Answer Engine Index: [llms.txt](llms.txt) | [llms-full.txt](llms-full.txt)
+
+## Repository Structure
+
+```text
 .
-├── Design.md                  # UI/UX Design System & layout tokens
-├── docs/                      # Interactive Guides & Documentation
-│   ├── ai-usage-monitor-mockup.html # UI Mockup (QuotaDeck)
-│   ├── quick-guide.html       # คู่มือฉบับย่อ สรุปทางลัดใน 1 หน้า
-│   └── vscode-extension-fundamentals.html # คู่มือพื้นฐานฉบับสมบูรณ์
-├── AGENTS.md                  # Agent rules and extension invariants
-├── extensions/                # VS Code Extensions
-│   ├── quotadeck/             # QuotaDeck — AI Usage & Limits
-│   └── starter-extension/     # Baseline template extension
+├── AGENTS.md                        # Monorepo invariants & extension engineering rules
+├── Design.md                        # Swiss-grid UI/UX design tokens (Light/Dark VS Code themes)
+├── llms.txt                         # Answer Engine Optimization (llms.txt index)
+├── llms-full.txt                    # Full machine-readable reference for LLMs & agents
+├── docs/                            # Reference guides & UI mockups
+│   ├── ai-usage-monitor-mockup.html
+│   ├── quick-guide.html
+│   └── vscode-extension-fundamentals.html
+├── extensions/
+│   ├── quotadeck/                   # QuotaDeck — AI Usage & Limits
+│   └── starter-extension/           # Minimal baseline extension template
 ├── .agents/
-│   ├── memory/                # Project memory (project.md, rules.md)
-│   └── skills/                # Agent skills (vscode-extension-creator)
-├── package.json               # Bun monorepo workspace configuration
-└── tsconfig.base.json         # Shared TypeScript compiler options
+│   ├── memory/                      # Project memory & confirmed constraints
+│   └── skills/                      # Extension development skills
+├── package.json                     # Bun monorepo workspace scripts
+└── tsconfig.base.json               # Shared strict TypeScript configuration
 ```
 
-## 🚀 Getting Started
+## Development
 
 ### Prerequisites
-- [Bun](https://bun.sh/) (v1.0+)
-- [Visual Studio Code](https://code.visualstudio.com/)
+- [Bun](https://bun.sh/) (`>= 1.0`)
+- Visual Studio Code `^1.90.0` (or Cursor / Windsurf / Antigravity)
 
-### Install Dependencies
+### Install, Typecheck, Test, Build & Package
+
 ```bash
+# Install workspace dependencies
 bun install
-```
 
-### Build Extensions
-```bash
-# Build all extensions
+# Typecheck & run unit tests for QuotaDeck
+cd extensions/quotadeck
+bunx tsc --noEmit
+bun test
+
+# Bundle all extensions with esbuild
 bun run compile
 
-# Build specific extension
-bun run --cwd extensions/starter-extension compile
+# Package QuotaDeck into a .vsix archive
+bun run --cwd extensions/quotadeck package
+
+# Install locally into VS Code
+code --install-extension extensions/quotadeck/quotadeck-0.2.0.vsix --force
 ```
 
-### Package into `.vsix` (Share with friends)
-```bash
-bun run --cwd extensions/starter-extension package
-```
-Install in VS Code:
-1. Open VS Code Extensions view (`Cmd+Shift+X` or `Ctrl+Shift+X`).
-2. Click `...` (Views and More Actions) at the top right.
-3. Select **Install from VSIX...** and pick the generated `.vsix` file.
+To install via the VS Code UI, open Extensions (`Cmd+Shift+X` / `Ctrl+Shift+X`), open the `...` menu, and select **Install from VSIX...**.

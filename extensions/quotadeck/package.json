@@ -1,8 +1,8 @@
 {
   "name": "quotadeck",
   "displayName": "QuotaDeck — AI Usage & Limits",
-  "description": "Track exact 5-hour/weekly quotas and credit balances across Antigravity, Claude Code, Codex, OpenRouter, DeepSeek, Cline, and custom endpoints.",
-  "version": "0.2.0",
+  "description": "Monitor 5-hour/weekly AI coding quotas, rate limits, and API credit balances for Antigravity, Claude Code, Codex, OpenRouter, DeepSeek, Cline, and custom endpoints.",
+  "version": "0.2.1",
   "publisher": "pornput-s",
   "author": {
     "name": "pornput.s"
@@ -12,7 +12,7 @@
     "color": "#0e1726",
     "theme": "dark"
   },
-  "homepage": "https://github.com/ChuBu0012/vscode-extension#readme",
+  "homepage": "https://github.com/ChuBu0012/vscode-extension/tree/main/extensions/quotadeck#readme",
   "bugs": {
     "url": "https://github.com/ChuBu0012/vscode-extension/issues"
   },
@@ -27,17 +27,28 @@
     "quota",
     "usage",
     "limits",
+    "rate-limit",
     "claude",
+    "claude-code",
     "codex",
     "antigravity",
-    "status bar"
+    "openrouter",
+    "deepseek",
+    "cline",
+    "llm",
+    "ai-agent",
+    "status-bar",
+    "monitoring",
+    "dashboard",
+    "api-credits"
   ],
   "engines": {
     "vscode": "^1.90.0"
   },
   "categories": [
-    "Other",
-    "Visualization"
+    "AI",
+    "Visualization",
+    "Other"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [

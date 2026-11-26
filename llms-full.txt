@@ -1,0 +1,72 @@
+# QuotaDeck — AI Usage & Limits (Full Technical Reference for Answer Engines)
+
+> QuotaDeck (`pornput-s.quotadeck`) is a zero-telemetry VS Code / Open VSX extension built with TypeScript, esbuild, and Bun that tracks 5-hour/weekly AI coding rate limits and credit balances across Antigravity, Claude Code, Codex, OpenRouter, DeepSeek, Cline / ClinePass, and custom HTTP/CLI providers.
+
+## Canonical Metadata
+- **Extension ID**: `pornput-s.quotadeck`
+- **Version**: `0.2.0`
+- **Publisher**: `pornput-s` (`author`: `pornput.s`)
+- **License**: `MIT`
+- **VS Code Engine**: `^1.90.0`
+- **Categories**: `AI`, `Visualization`, `Other`
+- **Open VSX Registry**: https://open-vsx.org/extension/pornput-s/quotadeck
+- **GitHub Repository**: https://github.com/ChuBu0012/vscode-extension
+- **Platforms**: macOS, Linux, Windows (native + WSL/Remote; spawns `agy` with `windowsHide: true` and `.cmd`/`.exe` resolution on Windows)
+
+## Installation Matrix
+- **Antigravity, Cursor, Windsurf, VSCodium**: Install directly from Open VSX by searching `QuotaDeck` or `pornput-s.quotadeck` in the Extensions panel.
+- **Microsoft Visual Studio Code**: Download `pornput-s.quotadeck-<version>.vsix` from Open VSX and install via **Extensions -> `...` -> Install from VSIX...** or `code --install-extension quotadeck-0.2.0.vsix`.
+
+## Supported Providers (v0.2.0)
+
+### 1. Zero-Config Local Agents (Auto-Detected on Startup)
+- **Antigravity (`agy`)**: Executes `agy --dangerously-skip-permissions -p /usage --print-timeout 15s` asynchronously and parses `Weekly` and `Five Hour` limits for Gemini and Claude pools.
+- **Claude Code (`claude`)**: Reads OAuth credentials from macOS Keychain (`Claude Code-credentials`) or `$CLAUDE_CONFIG_DIR/.credentials.json` (`~/.claude/.credentials.json` default) and queries `https://api.anthropic.com/api/oauth/usage` for `five_hour`, `seven_day`, `seven_day_sonnet`, and `seven_day_opus` windows.
+- **Codex (`codex`)**: Reads `$CODEX_HOME/auth.json` (`~/.codex/auth.json` default) and queries `https://chatgpt.com/backend-api/wham/usage` for `primary_window` (5h) and `secondary_window` (weekly) rate limits.
+- **Missing Tool Behavior**: If a local tool binary or credential file is not present when the editor starts, QuotaDeck marks it `not_connected`, hides its card from the Dashboard, and skips it during background auto-polling. Users can re-check local agents anytime via **`+ Add Agent`** or **`Refresh`**. Expired tokens (`401`/`403`) surface an `unavailable` notice prompting re-authentication.
+
+### 2. Official API Key Providers (`vscode.SecretStorage`)
+- **OpenRouter (`openrouter`)**: Queries `GET https://openrouter.ai/api/v1/key` and `GET https://openrouter.ai/api/v1/credits` using a key stored in `SecretStorage`.
+- **DeepSeek (`deepseek`)**: Queries `GET https://api.deepseek.com/user/balance` and renders remaining balance (`USD`/`CNY`) plus optional budget-cap percentage.
+- **Cline / ClinePass (`cline`)**: Queries `GET https://api.cline.bot/api/v1/users/me/plan/usage-limits` and `/balance` for 5h/weekly windows or pay-as-you-go balance.
+
+### 3. Custom HTTP JSON & Local CLI Providers (`quotadeck.customProviders`)
+- **Wizard & Settings**: Users can add custom providers interactively via **`+ Add Agent` -> `Custom HTTP / CLI Endpoint`** or by editing `quotadeck.customProviders` in `settings.json`.
+- **Security Constraints**:
+  - HTTP URLs must use `https://` or `http://localhost` / `127.0.0.1` / `::1`.
+  - CLI commands execute via `execFile` (`shell: false` on POSIX, `windowsHide: true` on Windows).
+  - JSON extraction (`extractJsonPath`) walks dot-separated segments safely using `Object.prototype.hasOwnProperty` and explicitly rejects `__proto__`, `constructor`, and `prototype`.
+  - Optional bearer secrets reside in `vscode.SecretStorage` and support `{{SECRET}}` header placeholder substitution.
+- **Value Types**: `percentage` (`0-100` remaining), `used_percentage` (`0-100` used, converted to `100 - used`), and `balance_usd` (supports optional `budgetCapUsd`).
+
+## Commands & Settings
+
+### Commands
+- `quotadeck.openDashboard`: QuotaDeck: Open Dashboard
+- `quotadeck.refresh`: QuotaDeck: Refresh Usage
+- `quotadeck.connectProvider`: QuotaDeck: Add Agent / Provider API Key
+- `quotadeck.disconnectProvider`: QuotaDeck: Disconnect Provider API Key
+- `quotadeck.clearHistory`: QuotaDeck: Clear History
+
+### Settings (`quotadeck.*`)
+- `quotadeck.displayMode`: `"remaining"` (default) | `"used"`
+- `quotadeck.statusBarProviders`: `string[]` (default `["agy-gemini", "claude", "codex"]`; supports `"agy-claude"`, `"openrouter"`, `"deepseek"`, `"cline"`, `"custom:<id>"`)
+- `quotadeck.pollingIntervalSeconds`: `number` (default `300`, UI range `60`–`3600`, sanitizer clamps `30`–`3600`)
+- `quotadeck.budgets`: `{ openrouter?: number, deepseek?: number, cline?: number }`
+- `quotadeck.customProviders`: `CustomProviderConfig[]`
+
+## Polling, Caching, & Security
+- **Adaptive Backoff**: Baseline interval -> `1x` -> `2x` -> `4x` when quota signatures remain unchanged (capped at `30` minutes); schedules wake-up `~2s` after the earliest reset timestamp when reset occurs before backoff delay; pauses polling while editor window is unfocused.
+- **Transient Error Fallback**: Returns last known cached snapshot on transient network/CLI failures (except `401`/`403`, which clear the snapshot cache and prompt re-authentication).
+- **Webview Isolation**: Uses per-panel CSP nonces (`default-src 'none'`), escapes all dynamic HTML text, persists UI layout/filter state in `vscode.setState`, and records usage snapshots locally in `context.globalStorageUri` JSONL with atomic compaction.
+
+## Frequently Asked Questions (Direct Q&A)
+
+**Q: Does QuotaDeck send usage data or API keys to any third-party server?**
+A: No. QuotaDeck contains zero telemetry or analytics. Credentials remain encrypted in `vscode.SecretStorage` and requests go solely to official provider endpoints or user-configured custom endpoints.
+
+**Q: Why does a disconnected or missing provider not appear on the Dashboard?**
+A: Providers with status `not_connected` (including API-key providers not yet connected and local tools missing on the machine) are hidden from the Dashboard to keep the workspace clutter-free. Click `+ Add Agent` to connect an API provider, add a custom endpoint, or re-check a newly installed local tool.
+
+**Q: How do I customize which agents appear in the VS Code Status Bar?**
+A: Click the inline `Bar` switch on any provider pool card inside the QuotaDeck Dashboard, or edit `quotadeck.statusBarProviders` in VS Code Settings.
