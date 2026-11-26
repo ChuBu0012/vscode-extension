@@ -1,0 +1,29 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Run QuotaDeck",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/extensions/quotadeck"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/extensions/quotadeck/dist/**/*.js"
+      ],
+      "preLaunchTask": "quotadeck:watch"
+    },
+    {
+      "name": "Run Starter Extension",
+      "type": "extensionHost",
+      "request": "launch",
+      "args": [
+        "--extensionDevelopmentPath=${workspaceFolder}/extensions/starter-extension"
+      ],
+      "outFiles": [
+        "${workspaceFolder}/extensions/starter-extension/dist/**/*.js"
+      ],
+      "preLaunchTask": "starter:watch"
+    }
+  ]
+}

@@ -1,0 +1,19 @@
+{
+  "name": "vscode-extensions-monorepo",
+  "private": true,
+  "workspaces": [
+    "extensions/*"
+  ],
+  "scripts": {
+    "compile": "bun --filter \"./extensions/*\" compile",
+    "watch": "bun --filter \"./extensions/*\" watch",
+    "package": "bun --filter \"./extensions/*\" package"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/most-too/vscode-extension"
+  },
+  "devDependencies": {
+    "@vscode/vsce": "^3.2.1"
+  }
+}

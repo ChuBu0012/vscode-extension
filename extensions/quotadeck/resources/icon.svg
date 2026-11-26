@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="256" height="256" viewBox="0 0 256 256">
+  <rect x="0" y="0" width="256" height="256" rx="0" fill="#0e1726"/>
+  <path d="M 147.26 86.23 L 164.00 49.90 A 86.00 86.00 0 0 1 191.15 69.62 L 161.78 96.78 A 46.00 46.00 0 0 0 147.26 86.23 Z" fill="#1f2e42" stroke="#1f2e42" stroke-width="9" stroke-linejoin="round" />
+  <path d="M 168.13 105.52 L 203.03 85.98 A 86.00 86.00 0 0 1 213.40 117.89 L 173.68 122.59 A 46.00 46.00 0 0 0 168.13 105.52 Z" fill="#1f2e42" stroke="#1f2e42" stroke-width="9" stroke-linejoin="round" />
+  <path d="M 173.68 133.41 L 213.40 138.11 A 86.00 86.00 0 0 1 203.03 170.02 L 168.13 150.48 A 46.00 46.00 0 0 0 173.68 133.41 Z" fill="#1f2e42" stroke="#1f2e42" stroke-width="9" stroke-linejoin="round" />
+  <path d="M 161.78 159.22 L 191.15 186.38 A 86.00 86.00 0 0 1 164.00 206.10 L 147.26 169.77 A 46.00 46.00 0 0 0 161.78 159.22 Z" fill="#1d6ff2" stroke="#1d6ff2" stroke-width="9" stroke-linejoin="round" />
+  <path d="M 136.97 173.12 L 144.78 212.35 A 86.00 86.00 0 0 1 111.22 212.35 L 119.03 173.12 A 46.00 46.00 0 0 0 136.97 173.12 Z" fill="#1d6ff2" stroke="#1d6ff2" stroke-width="9" stroke-linejoin="round" />
+  <path d="M 108.74 169.77 L 92.00 206.10 A 86.00 86.00 0 0 1 64.85 186.38 L 94.22 159.22 A 46.00 46.00 0 0 0 108.74 169.77 Z" fill="#1d6ff2" stroke="#1d6ff2" stroke-width="9" stroke-linejoin="round" />
+  <path d="M 87.87 150.48 L 52.97 170.02 A 86.00 86.00 0 0 1 42.60 138.11 L 82.32 133.41 A 46.00 46.00 0 0 0 87.87 150.48 Z" fill="#10b981" stroke="#10b981" stroke-width="9" stroke-linejoin="round" />
+  <path d="M 82.32 122.59 L 42.60 117.89 A 86.00 86.00 0 0 1 52.97 85.98 L 87.87 105.52 A 46.00 46.00 0 0 0 82.32 122.59 Z" fill="#10b981" stroke="#10b981" stroke-width="9" stroke-linejoin="round" />
+  <path d="M 94.22 96.78 L 64.85 69.62 A 86.00 86.00 0 0 1 92.00 49.90 L 108.74 86.23 A 46.00 46.00 0 0 0 94.22 96.78 Z" fill="#10b981" stroke="#10b981" stroke-width="9" stroke-linejoin="round" />
+  <path d="M 119.03 82.88 L 111.22 43.65 A 86.00 86.00 0 0 1 144.78 43.65 L 136.97 82.88 A 46.00 46.00 0 0 0 119.03 82.88 Z" fill="#f59e0b" stroke="#f59e0b" stroke-width="9" stroke-linejoin="round" />
+</svg>

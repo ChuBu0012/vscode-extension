@@ -1,0 +1,25 @@
+{
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "quotadeck:watch",
+      "type": "shell",
+      "command": "bun run watch",
+      "options": {
+        "cwd": "${workspaceFolder}/extensions/quotadeck"
+      },
+      "isBackground": true,
+      "problemMatcher": "$esbuild-watch"
+    },
+    {
+      "label": "starter:watch",
+      "type": "shell",
+      "command": "bun run watch",
+      "options": {
+        "cwd": "${workspaceFolder}/extensions/starter-extension"
+      },
+      "isBackground": true,
+      "problemMatcher": "$esbuild-watch"
+    }
+  ]
+}

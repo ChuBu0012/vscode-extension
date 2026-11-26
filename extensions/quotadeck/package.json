@@ -1,0 +1,101 @@
+{
+  "name": "quotadeck",
+  "displayName": "QuotaDeck — AI Usage & Limits",
+  "description": "Track exact 5-hour and weekly usage quotas across Antigravity, Claude Code, and Codex right in your VS Code Status Bar and minimalist Dashboard.",
+  "version": "0.1.0",
+  "publisher": "most-too",
+  "icon": "resources/icon.png",
+  "galleryBanner": {
+    "color": "#0e1726",
+    "theme": "dark"
+  },
+  "homepage": "https://github.com/most-too/vscode-extension#readme",
+  "bugs": {
+    "url": "https://github.com/most-too/vscode-extension/issues"
+  },
+  "qna": "marketplace",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/most-too/vscode-extension"
+  },
+  "license": "MIT",
+  "keywords": [
+    "ai",
+    "quota",
+    "usage",
+    "limits",
+    "claude",
+    "codex",
+    "antigravity",
+    "status bar"
+  ],
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [
+    "onStartupFinished"
+  ],
+  "contributes": {
+    "commands": [
+      {
+        "command": "quotadeck.openDashboard",
+        "title": "Open Dashboard",
+        "category": "QuotaDeck"
+      },
+      {
+        "command": "quotadeck.refresh",
+        "title": "Refresh Usage",
+        "category": "QuotaDeck"
+      },
+      {
+        "command": "quotadeck.clearHistory",
+        "title": "Clear History",
+        "category": "QuotaDeck"
+      }
+    ],
+    "configuration": {
+      "title": "QuotaDeck",
+      "properties": {
+        "quotadeck.pollingIntervalSeconds": {
+          "type": "number",
+          "default": 300,
+          "minimum": 60,
+          "maximum": 3600,
+          "description": "Polling interval in seconds for refreshing usage quotas."
+        },
+        "quotadeck.displayMode": {
+          "type": "string",
+          "enum": ["remaining", "used"],
+          "default": "remaining",
+          "description": "Display quota percentages as remaining ('left') or consumed ('used') across all providers."
+        },
+        "quotadeck.statusBarProviders": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["agy-gemini", "agy-claude", "claude", "codex"]
+          },
+          "default": ["agy-gemini", "claude", "codex"],
+          "description": "Which provider quotas to show in the Status Bar."
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "bun run compile:prod",
+    "compile": "bun esbuild.js",
+    "compile:prod": "bun esbuild.js --production",
+    "watch": "bun esbuild.js --watch",
+    "package": "bun run compile:prod && bunx @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.21.5",
+    "typescript": "^5.4.5"
+  }
+}

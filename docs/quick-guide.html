@@ -1,0 +1,833 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>VS Code Extension Quick Guide — สรุปทางลัดใน 1 หน้า</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      /* Cozy VS Code deep slate theme matching editor palette */
+      --bg: #0e1726;
+      --bg-surface: #0a111b;
+      --bg-subtle: #121e2d;
+      --text: #dce5f0;
+      --text-muted: #9eb1c7;
+      --text-faint: #647b94;
+      --border: #1a2738;
+      --border-focus: #38bdf8;
+      --heading-pink: #f472b6;
+      --accent: #38bdf8;
+      --accent-dim: rgba(56, 189, 248, 0.1);
+      --code-bg: #070d15;
+      --code-border: #172436;
+      --callout-info-bg: rgba(56, 189, 248, 0.08);
+      --callout-info-border: #38bdf8;
+      --callout-warn-bg: rgba(251, 191, 36, 0.08);
+      --callout-warn-border: #f59e0b;
+      --callout-danger-bg: rgba(244, 114, 182, 0.08);
+      --callout-danger-border: #f472b6;
+      --font-sans: "Sukhumvit Set", "Noto Sans Thai", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      --font-mono: "JetBrains Mono", "Fira Code", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+      --container-width: 900px;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    html {
+      scroll-behavior: smooth;
+      font-size: 16px;
+      background-color: #0e1726 !important;
+      color: #dce5f0 !important;
+    }
+    body {
+      font-family: var(--font-sans);
+      background-color: #0e1726 !important;
+      color: #dce5f0 !important;
+      line-height: 1.7;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      min-height: 100vh;
+      padding: 2.5rem 1.5rem 5rem 1.5rem;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    .container {
+      width: 100%;
+      max-width: var(--container-width);
+    }
+
+    /* Top Navigation Switcher */
+    .top-nav {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 2.5rem;
+      padding-bottom: 1.25rem;
+      border-bottom: 1px solid var(--border);
+      flex-wrap: wrap;
+      gap: 1rem;
+    }
+    .brand {
+      display: flex;
+      align-items: center;
+      gap: 0.75rem;
+    }
+    .brand-logo {
+      width: 28px;
+      height: 28px;
+      background: var(--heading-pink);
+      border-radius: 6px;
+      display: grid;
+      place-items: center;
+      color: #0e1726;
+      font-weight: 800;
+      font-size: 0.85rem;
+    }
+    .brand-title {
+      font-size: 1rem;
+      font-weight: 700;
+      color: #f1f5f9;
+    }
+    .full-guide-btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 0.5rem;
+      padding: 0.45rem 0.9rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.825rem;
+      font-weight: 500;
+      transition: all 0.15s ease;
+    }
+    .full-guide-btn:hover {
+      color: #f1f5f9;
+      border-color: var(--accent);
+      background: var(--bg-subtle);
+    }
+
+    /* Header */
+    .badge {
+      display: inline-block;
+      font-size: 0.725rem;
+      font-weight: 600;
+      padding: 0.2rem 0.6rem;
+      border-radius: 9999px;
+      background: rgba(244, 114, 182, 0.12);
+      color: var(--heading-pink);
+      margin-bottom: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border: 1px solid rgba(244, 114, 182, 0.25);
+    }
+    h1 {
+      font-size: 2.25rem;
+      font-weight: 800;
+      letter-spacing: -0.025em;
+      line-height: 1.25;
+      margin-bottom: 0.75rem;
+      color: var(--heading-pink);
+    }
+    p.lead {
+      font-size: 1.1rem;
+      color: var(--text-muted);
+      margin-bottom: 2.5rem;
+    }
+
+    /* Jump Pills */
+    .jump-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.5rem;
+      margin-bottom: 3rem;
+      padding: 0.75rem 1rem;
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+    }
+    .jump-pills a {
+      color: var(--text-muted);
+      text-decoration: none;
+      font-size: 0.825rem;
+      padding: 0.3rem 0.65rem;
+      border-radius: 4px;
+      background: var(--bg-subtle);
+      transition: all 0.15s ease;
+    }
+    .jump-pills a:hover {
+      color: #f1f5f9;
+      background: rgba(56, 189, 248, 0.15);
+    }
+
+    /* Section Cards */
+    section {
+      margin-bottom: 3.5rem;
+      scroll-margin-top: 1.5rem;
+    }
+    h2 {
+      font-size: 1.35rem;
+      font-weight: 700;
+      letter-spacing: -0.02em;
+      margin-bottom: 1.2rem;
+      padding-bottom: 0.5rem;
+      border-bottom: 1px solid var(--border);
+      color: var(--heading-pink);
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+    }
+    h3 {
+      font-size: 1.05rem;
+      font-weight: 600;
+      margin: 1.5rem 0 0.65rem 0;
+      color: var(--accent);
+    }
+    p { margin-bottom: 1rem; color: var(--text-muted); }
+    strong { color: #f1f5f9; font-weight: 600; }
+
+    /* Step Grid */
+    .step-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+      gap: 1rem;
+      margin: 1.25rem 0;
+    }
+    .step-card {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 1.25rem;
+      position: relative;
+    }
+    .step-num {
+      position: absolute;
+      top: 1rem;
+      right: 1rem;
+      font-family: var(--font-mono);
+      font-size: 0.8rem;
+      font-weight: 700;
+      color: var(--text-faint);
+    }
+    .step-card h4 {
+      font-size: 0.95rem;
+      color: #f1f5f9;
+      margin-bottom: 0.45rem;
+    }
+    .step-card p {
+      font-size: 0.85rem;
+      margin-bottom: 0;
+      line-height: 1.55;
+    }
+
+    /* Danger 3 Sins */
+    .sins-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+      gap: 1rem;
+      margin: 1.25rem 0;
+    }
+    .sin-card {
+      background: rgba(244, 114, 182, 0.04);
+      border: 1px solid rgba(244, 114, 182, 0.2);
+      border-left: 3px solid var(--heading-pink);
+      border-radius: 0 8px 8px 0;
+      padding: 1rem 1.2rem;
+    }
+    .sin-card h4 {
+      font-size: 0.9rem;
+      color: var(--heading-pink);
+      margin-bottom: 0.35rem;
+    }
+    .sin-card p {
+      font-size: 0.825rem;
+      margin-bottom: 0;
+      line-height: 1.5;
+    }
+
+    /* Tables */
+    .table-wrapper {
+      overflow-x: auto;
+      margin: 1.25rem 0;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      background: var(--bg-surface);
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      text-align: left;
+      font-size: 0.875rem;
+    }
+    th, td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+    }
+    th {
+      background: var(--bg-subtle);
+      font-weight: 600;
+      color: #f1f5f9;
+      font-size: 0.8rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    tr:last-child td { border-bottom: none; }
+
+    /* Code Blocks */
+    pre {
+      background: var(--code-bg);
+      border: 1px solid var(--code-border);
+      border-radius: 8px;
+      padding: 1.15rem;
+      overflow-x: auto;
+      font-family: var(--font-mono);
+      font-size: 0.835rem;
+      line-height: 1.6;
+      margin: 1rem 0;
+      color: #e2e8f0;
+    }
+    code:not(pre code) {
+      font-family: var(--font-mono);
+      font-size: 0.85em;
+      background: var(--bg-subtle);
+      color: var(--accent);
+      padding: 0.15rem 0.35rem;
+      border-radius: 4px;
+      border: 1px solid var(--border);
+    }
+    .code-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      background: var(--bg-surface);
+      border: 1px solid var(--code-border);
+      border-bottom: none;
+      border-radius: 8px 8px 0 0;
+      padding: 0.4rem 1rem;
+      font-size: 0.75rem;
+      font-family: var(--font-mono);
+      color: var(--text-faint);
+    }
+    .code-header + pre {
+      margin-top: 0;
+      border-top-left-radius: 0;
+      border-top-right-radius: 0;
+    }
+    .copy-btn {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      color: var(--text-muted);
+      border-radius: 4px;
+      padding: 0.2rem 0.5rem;
+      font-size: 0.725rem;
+      cursor: pointer;
+      font-family: var(--font-sans);
+      transition: all 0.15s ease;
+    }
+    .copy-btn:hover { color: #f1f5f9; border-color: var(--accent); }
+
+    .callout {
+      border-left: 3px solid var(--accent);
+      background: var(--callout-info-bg);
+      padding: 1rem 1.25rem;
+      border-radius: 0 8px 8px 0;
+      margin: 1.25rem 0;
+      font-size: 0.9rem;
+    }
+    .callout-title {
+      font-weight: 700;
+      color: #f1f5f9;
+      margin-bottom: 0.35rem;
+    }
+
+    /* Visual Workbench Map */
+    .wb-map {
+      background: var(--bg-surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      overflow: hidden;
+      margin: 1.5rem 0;
+      font-size: 0.8rem;
+    }
+    .wb-titlebar {
+      background: #070c14;
+      border-bottom: 1px solid var(--border);
+      padding: 0.45rem 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      color: var(--text-faint);
+      font-family: var(--font-mono);
+      font-size: 0.725rem;
+    }
+    .wb-palette {
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      padding: 0.2rem 0.75rem;
+      border-radius: 4px;
+      color: var(--accent);
+    }
+    .wb-body {
+      display: grid;
+      grid-template-columns: 54px 210px 1fr;
+      min-height: 250px;
+    }
+    @media (max-width: 700px) {
+      .wb-body { grid-template-columns: 1fr; }
+    }
+    .wb-activity {
+      background: #070d15;
+      border-right: 1px solid var(--border);
+      padding: 0.6rem 0.35rem;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 0.65rem;
+      color: var(--text-faint);
+      text-align: center;
+      font-size: 0.68rem;
+    }
+    .wb-activity-dot {
+      width: 28px;
+      height: 28px;
+      border-radius: 6px;
+      background: rgba(244, 114, 182, 0.12);
+      border: 1px solid rgba(244, 114, 182, 0.35);
+      color: var(--heading-pink);
+      display: grid;
+      place-items: center;
+      font-weight: 700;
+    }
+    .wb-sidebar {
+      background: #09101a;
+      border-right: 1px solid var(--border);
+      padding: 0.75rem;
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+    }
+    .wb-zone-title {
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: var(--heading-pink);
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+    }
+    .wb-zone-desc {
+      color: var(--text-muted);
+      font-size: 0.76rem;
+      line-height: 1.45;
+    }
+    .wb-main {
+      display: flex;
+      flex-direction: column;
+      background: var(--bg);
+    }
+    .wb-editor {
+      flex: 1;
+      padding: 0.85rem 1rem;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      gap: 0.45rem;
+    }
+    .wb-notif {
+      align-self: flex-end;
+      margin-top: auto;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      border-left: 3px solid var(--accent);
+      border-radius: 6px;
+      padding: 0.45rem 0.7rem;
+      font-size: 0.73rem;
+      color: var(--text);
+      max-width: 260px;
+    }
+    .wb-panel {
+      border-top: 1px solid var(--border);
+      background: #080e17;
+      padding: 0.6rem 1rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 0.75rem;
+      flex-wrap: wrap;
+    }
+    .wb-statusbar {
+      background: #0d2238;
+      border-top: 1px solid var(--border);
+      padding: 0.3rem 0.85rem;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      font-family: var(--font-mono);
+      font-size: 0.72rem;
+      color: var(--accent);
+    }
+    .wb-tag {
+      display: inline-block;
+      background: var(--bg-subtle);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      font-family: var(--font-mono);
+      font-size: 0.7rem;
+      margin-top: 0.2rem;
+    }
+
+    footer {
+      margin-top: 4rem;
+      padding-top: 2rem;
+      border-top: 1px solid var(--border);
+      font-size: 0.85rem;
+      color: var(--text-faint);
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div class="container">
+    <!-- Top Nav -->
+    <div class="top-nav">
+      <div class="brand">
+        <div class="brand-logo">VS</div>
+        <div class="brand-title">Extension Quick Guide</div>
+      </div>
+      <a href="vscode-extension-fundamentals.html" class="full-guide-btn">
+        <span>📖 เปิดอ่านคู่มือฉบับสมบูรณ์ (Fundamentals)</span>
+        <span>&rarr;</span>
+      </a>
+    </div>
+
+    <!-- Header -->
+    <span class="badge">Cheat Sheet & Quick Reference</span>
+    <h1>VS Code Extension Quick Guide</h1>
+    <p class="lead">คู่มือสรุปทางลัดสำหรับลงมือทำทันที: 30-Second Workflow, Top 7 Snippets, คำสั่ง CLI และวิธีแชร์ .vsix ให้เพื่อนใช้งาน</p>
+
+    <!-- Jump Pills -->
+    <div class="jump-pills">
+      <a href="#quickstart">⚡ 30-Second Workflow</a>
+      <a href="#ui-map">🎨 ส่วนต่างๆ ของ VS Code UI</a>
+      <a href="#rules">⚠️ 3 กฎเหล็ก</a>
+      <a href="#anatomy">📁 4 ไฟล์ต้องรู้</a>
+      <a href="#snippets">🎯 Top 7 Snippets</a>
+      <a href="#commands">💻 คำสั่ง CLI</a>
+      <a href="#sharing">📦 วิธีส่ง .vsix ให้เพื่อน</a>
+    </div>
+
+    <!-- 1. 30-SECOND WORKFLOW -->
+    <section id="quickstart">
+      <h2>1. Workflow 30 วินาที (Start in 30 Seconds)</h2>
+      <div class="step-grid">
+        <div class="step-card">
+          <div class="step-num">01</div>
+          <h4>เปิดไฟล์ Code Entry</h4>
+          <p>เข้าโฟลเดอร์ extension แล้วเขียน logic ที่ไฟล์ <code>src/extension.ts</code> ในฟังก์ชัน <code>activate()</code></p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">02</div>
+          <h4>กดปุ่ม F5 เพื่อทดสอบ</h4>
+          <p>VS Code จะเปิดหน้าต่างใหม่ <strong>[Extension Development Host]</strong> ที่ติดตั้ง extension ของเราไว้พร้อมลองเล่น</p>
+        </div>
+        <div class="step-card">
+          <div class="step-num">03</div>
+          <h4>แพ็ก .vsix ส่งเพื่อน</h4>
+          <p>รัน <code>bun run package</code> เพื่อสร้างไฟล์ <code>.vsix</code> ขนาดเล็ก (2-3 KB) ส่งให้เพื่อนติดตั้งได้เลย</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 2. VS CODE UI ANATOMY -->
+    <section id="ui-map">
+      <h2>2. ส่วนต่างๆ ของ VS Code UI (เลือกวางฟีเจอร์ให้ถูกที่)</h2>
+      <p>ก่อนเริ่มเขียน ลองดูแผนผังตำแหน่งต่างๆ บนหน้าจอ VS Code ว่าส่วนไหนเหมาะกับฟีเจอร์แบบใด:</p>
+
+      <div class="wb-map">
+        <div class="wb-titlebar">
+          <span>VS Code Workbench</span>
+          <span class="wb-palette">⌘⇧P Command Palette / QuickPick / InputBox</span>
+          <span>Window</span>
+        </div>
+        <div class="wb-body">
+          <div class="wb-activity">
+            <div class="wb-activity-dot">⚡</div>
+            <span>Activity Bar</span>
+          </div>
+          <div class="wb-sidebar">
+            <div class="wb-zone-title">Primary Sidebar</div>
+            <div class="wb-zone-desc">พื้นที่ด้านข้าง สำหรับแสดงรายการหรือเครื่องมือ</div>
+            <div><span class="wb-tag">TreeView</span> <span class="wb-tag">WebviewView</span></div>
+          </div>
+          <div class="wb-main">
+            <div class="wb-editor">
+              <div class="wb-zone-title">Editor Area (พื้นที่หลักตรงกลาง)</div>
+              <div class="wb-zone-desc">แก้ไขโค้ด (<code>TextEditor</code>), แสดงหน้าเว็บอิสระแบบเต็มแท็บ (<code>WebviewPanel</code>), เมนูคลิกขวา (<code>editor/context</code>), Hover / Autocomplete</div>
+              <div class="wb-notif">
+                <strong style="color: var(--accent);">Notification / Progress</strong><br>
+                มุมขวาล่าง: <code>withProgress</code>, <code>showInformationMessage</code>
+              </div>
+            </div>
+            <div class="wb-panel">
+              <div>
+                <span class="wb-zone-title">Bottom Panel:</span>
+                <span class="wb-zone-desc"><code>OutputChannel</code> (Logs), <code>Terminal</code>, <code>Problems</code> (Diagnostics)</span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="wb-statusbar">
+          <span>Status Bar (ซ้าย): $(git-branch) main</span>
+          <span>Status Bar (ขวา): $(zap) My Extension • createStatusBarItem</span>
+        </div>
+      </div>
+
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>อยากทำ UI แบบนี้...</th>
+              <th>ใช้อะไร / API ไหน</th>
+              <th>ประกาศใน <code>package.json</code> ไหม?</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><strong>ปุ่มสถานะ / ตัวนับมุมล่าง</strong></td>
+              <td><code>vscode.window.createStatusBarItem()</code></td>
+              <td>ไม่ต้อง (สร้างใน <code>extension.ts</code> ได้เลย)</td>
+            </tr>
+            <tr>
+              <td><strong>ไอคอนแถบซ้าย + เมนูรายการ (Tree)</strong></td>
+              <td><code>vscode.window.registerTreeDataProvider()</code></td>
+              <td>ต้องใส่ <code>viewsContainers</code> + <code>views</code></td>
+            </tr>
+            <tr>
+              <td><strong>หน้าเว็บ HTML/CSS/JS ใน Sidebar</strong></td>
+              <td><code>vscode.window.registerWebviewViewProvider()</code></td>
+              <td>ต้องใส่ <code>views</code> (ระบุ <code>"type": "webview"</code>)</td>
+            </tr>
+            <tr>
+              <td><strong>หน้าเว็บ HTML/CSS/JS เต็มแท็บ</strong></td>
+              <td><code>vscode.window.createWebviewPanel()</code></td>
+              <td>ไม่ต้อง (เปิดผ่าน Command ได้เลย)</td>
+            </tr>
+            <tr>
+              <td><strong>กล่องให้เลือก / กรอกข้อความเร็วๆ</strong></td>
+              <td><code>showQuickPick()</code> / <code>showInputBox()</code></td>
+              <td>ไม่ต้อง</td>
+            </tr>
+            <tr>
+              <td><strong>บันทึก Log ไว้ Debug เงียบๆ</strong></td>
+              <td><code>vscode.window.createOutputChannel()</code></td>
+              <td>ไม่ต้อง</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 3. THREE DEADLY SINS -->
+    <section id="rules">
+      <h2>3. กฎเหล็ก 3 ข้อที่ห้ามทำ (3 Deadly Sins)</h2>
+      <div class="sins-grid">
+        <div class="sin-card">
+          <h4>1. ห้ามลืม Dispose</h4>
+          <p>ทุก Command, Status Bar, Listener ต้องใส่ <code>context.subscriptions.push(...)</code> เสมอ ไม่งั้นเกิด Memory Leak</p>
+        </div>
+        <div class="sin-card">
+          <h4>2. ห้ามรัน Sync หนักๆ</h4>
+          <p>ห้ามใช้ <code>fs.readFileSync</code> ไฟล์ใหญ่หรือลูปหนักๆ เพราะจะทำให้ VS Code ของผู้ใช้ค้างทั้งโปรแกรม</p>
+        </div>
+        <div class="sin-card">
+          <h4>3. ห้ามสแปม Notification</h4>
+          <p>ห้ามเด้ง <code>showInformationMessage</code> ตอนเปิดโปรแกรม ให้ใช้ Status Bar หรือ Output Channel แทน</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- 3. FILE ANATOMY -->
+    <section id="anatomy">
+      <h2>4. โครงสร้างไฟล์ 4 ไฟล์หลักที่ต้องรู้</h2>
+      <div class="table-wrapper">
+        <table>
+          <thead>
+            <tr>
+              <th>ไฟล์</th>
+              <th>หน้าที่สำคัญ</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr>
+              <td><code>package.json</code></td>
+              <td><strong>Manifest:</strong> ประกาศคำสั่ง (<code>contributes.commands</code>), เมนู, ปุ่มลัด, และ minimum VS Code version</td>
+            </tr>
+            <tr>
+              <td><code>src/extension.ts</code></td>
+              <td><strong>Code Entry:</strong> ฟังก์ชัน <code>activate(context)</code> (เริ่มทำงาน) และ <code>deactivate()</code> (คืนหน่วยความจำ)</td>
+            </tr>
+            <tr>
+              <td><code>esbuild.js</code></td>
+              <td><strong>Bundler:</strong> รวมไฟล์ TypeScript ทั้งหมดให้เหลือไฟล์เดียวใน <code>dist/extension.js</code> (เปิดติดในเสี้ยววินาที)</td>
+            </tr>
+            <tr>
+              <td><code>.vscodeignore</code></td>
+              <td><strong>Packaging Filter:</strong> กันไม่ให้เอาซอร์สโค้ดดิบและ <code>node_modules</code> ติดเข้าไปในไฟล์ <code>.vsix</code></td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 4. TOP 7 SNIPPETS -->
+    <section id="snippets">
+      <h2>5. Top 7 Snippets (ก๊อปปี้ไปวางได้ทันที)</h2>
+
+      <h3>1. ลงทะเบียนคำสั่ง (Register Command)</h3>
+      <div class="code-header"><span>src/extension.ts</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><code class="language-typescript">const cmd = vscode.commands.registerCommand('myExt.hello', () => {
+  vscode.window.showInformationMessage('สวัสดีจาก Extension!');
+});
+context.subscriptions.push(cmd);</code></pre>
+
+      <h3>2. ปุ่มสถานะด้านล่าง (Status Bar Item)</h3>
+      <div class="code-header"><span>Status Bar</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><code class="language-typescript">const barItem = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Right, 100);
+barItem.command = 'myExt.hello';
+barItem.text = '$(zap) คลิกเพื่อเริ่ม'; // ใช้ Codicons เช่น $(zap), $(gear), $(check)
+barItem.tooltip = 'คำอธิบายเมื่อเอาเมาส์ชี้';
+barItem.show();
+context.subscriptions.push(barItem);</code></pre>
+
+      <h3>3. กล่องตัวเลือก QuickPick (ถามผู้ใช้แบบเลือกรายการ)</h3>
+      <div class="code-header"><span>QuickPick</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><code class="language-typescript">const choice = await vscode.window.showQuickPick(
+  [
+    { label: 'โหมด A', description: 'ทำงานแบบอัตโนมัติ' },
+    { label: 'โหมด B', description: 'ทำงานแบบกำหนดเอง' }
+  ],
+  { placeHolder: 'เลือกโหมดที่ต้องการใช้งาน...' }
+);
+if (choice) {
+  console.log('ผู้ใช้เลือก:', choice.label);
+}</code></pre>
+
+      <h3>4. กล่องรับข้อความ InputBox (กรอกข้อมูล)</h3>
+      <div class="code-header"><span>InputBox</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><code class="language-typescript">const name = await vscode.window.showInputBox({
+  title: 'กรอกชื่อโปรเจกต์',
+  placeHolder: 'my-project',
+  validateInput: (text) => text.trim() ? null : 'กรุณากรอกข้อความ'
+});</code></pre>
+
+      <h3>5. แก้ไขโค้ดใน Editor ปัจจุบัน (Text Editing)</h3>
+      <div class="code-header"><span>Editor Edit</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><code class="language-typescript">const editor = vscode.window.activeTextEditor;
+if (editor) {
+  const selection = editor.selection;
+  const text = editor.document.getText(selection);
+
+  await editor.edit((edit) => {
+    // แทนที่ข้อความที่คลุมด้วยตัวพิมพ์ใหญ่ (หรือแทรกข้อความถ้าไม่ได้คลุม)
+    edit.replace(selection, text ? text.toUpperCase() : '// แทรกข้อความใหม่\n');
+  });
+}</code></pre>
+
+      <h3>6. แสดงหลอดความคืบหน้า (Progress Notification)</h3>
+      <div class="code-header"><span>WithProgress</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><code class="language-typescript">await vscode.window.withProgress(
+  {
+    location: vscode.ProgressLocation.Notification,
+    title: 'กำลังประมวลผล...',
+    cancellable: true
+  },
+  async (progress, token) => {
+    progress.report({ increment: 50, message: 'ครึ่งทางแล้ว' });
+    await new Promise(r => setTimeout(r, 1000));
+    progress.report({ increment: 50, message: 'เสร็จสิ้น!' });
+  }
+);</code></pre>
+
+      <h3>7. เก็บ API Key อย่างปลอดภัยเข้า OS Keychain (Secrets)</h3>
+      <div class="code-header"><span>SecretStorage</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><code class="language-typescript">// เก็บ API Key
+await context.secrets.store('gemini-key', 'AIzaSy...');
+
+// ดึงมาใช้งาน
+const key = await context.secrets.get('gemini-key');</code></pre>
+    </section>
+
+    <!-- 5. COMMON COMMANDS -->
+    <section id="commands">
+      <h2>6. คำสั่ง CLI สรุปย่อใน Monorepo นี้</h2>
+      <div class="code-header"><span>Terminal</span><button class="copy-btn" onclick="copyCode(this)">Copy</button></div>
+<pre><code class="language-bash"># ติดตั้ง dependencies ทั้งหมดในโปรเจกต์
+bun install
+
+# สั่ง Compile ทุก Extension ด้วย esbuild
+bun run compile
+
+# สั่ง Watch โค้ดของ Extension เฉพาะตัว (แก้งานแล้ว build ทันที)
+bun run --cwd extensions/starter-extension watch
+
+# สั่งแพ็กไฟล์ .vsix สำหรับส่งให้เพื่อน
+bun run --cwd extensions/starter-extension package</code></pre>
+    </section>
+
+    <!-- 6. SHARING .VSIX -->
+    <section id="sharing">
+      <h2>7. วิธีส่งและติดตั้งไฟล์ .vsix ให้เพื่อน</h2>
+      <div class="callout">
+        <div class="callout-title">📦 วิธีการสำหรับเพื่อน (ไม่ผ่าน Marketplace)</div>
+        <ol style="margin-left: 1.25rem; margin-top: 0.5rem; color: var(--text);">
+          <li style="margin-bottom: 0.35rem;">คุณรันคำสั่ง <code>bun run --cwd extensions/&lt;name&gt; package</code> จะได้ไฟล์ <code>.vsix</code> เช่น <code>starter-extension-0.0.1.vsix</code></li>
+          <li style="margin-bottom: 0.35rem;">ส่งไฟล์ <code>.vsix</code> นั้นให้เพื่อนทาง Discord, LINE, หรือ Google Drive</li>
+          <li style="margin-bottom: 0.35rem;">ให้เพื่อนเปิด VS Code &gt; กด <code>Cmd+Shift+X</code> (หรือ <code>Ctrl+Shift+X</code>)</li>
+          <li style="margin-bottom: 0.35rem;">คลิกที่ไอคอนจุดสามจุด <code>...</code> ที่มุมบนขวาของแผง Extensions</li>
+          <li style="margin-bottom: 0.35rem;">เลือก <strong>"Install from VSIX..."</strong> แล้วเลือกไฟล์ที่ส่งให้</li>
+          <li>ติดตั้งเสร็จพร้อมใช้งานได้ทันที 100%!</li>
+        </ol>
+      </div>
+    </section>
+
+    <footer>
+      <div>VS Code Extension Monorepo • สรุปทางลัด Quick Guide</div>
+      <div><a href="vscode-extension-fundamentals.html" style="color: var(--accent); text-decoration: none;">&larr; กลับไปยังคู่มือฉบับเต็ม</a></div>
+    </footer>
+  </div>
+
+  <script>
+    function copyCode(button) {
+      const pre = button.parentElement.nextElementSibling;
+      const code = pre.querySelector('code').innerText;
+      const done = () => {
+        const originalText = button.innerText;
+        button.innerText = 'คัดลอกแล้ว!';
+        setTimeout(() => { button.innerText = originalText; }, 2000);
+      };
+      if (navigator.clipboard && navigator.clipboard.writeText) {
+        navigator.clipboard.writeText(code).then(done).catch(() => fallbackCopy(code, done));
+      } else {
+        fallbackCopy(code, done);
+      }
+    }
+
+    function fallbackCopy(text, cb) {
+      const ta = document.createElement('textarea');
+      ta.value = text;
+      ta.style.position = 'fixed';
+      ta.style.opacity = '0';
+      document.body.appendChild(ta);
+      ta.select();
+      try { document.execCommand('copy'); cb(); } catch (e) {}
+      document.body.removeChild(ta);
+    }
+  </script>
+</body>
+</html>

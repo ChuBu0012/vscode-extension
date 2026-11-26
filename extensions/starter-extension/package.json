@@ -1,0 +1,42 @@
+{
+  "name": "starter-extension",
+  "displayName": "Starter Extension",
+  "description": "Baseline VS Code extension boilerplate built with TypeScript and esbuild",
+  "version": "0.0.1",
+  "publisher": "most-too",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/most-too/vscode-extension"
+  },
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.90.0"
+  },
+  "categories": [
+    "Other"
+  ],
+  "main": "./dist/extension.js",
+  "activationEvents": [],
+  "contributes": {
+    "commands": [
+      {
+        "command": "starterExtension.helloWorld",
+        "title": "Hello World",
+        "category": "Starter Extension"
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "bun run compile:prod",
+    "compile": "bun esbuild.js",
+    "compile:prod": "bun esbuild.js --production",
+    "watch": "bun esbuild.js --watch",
+    "package": "bun run compile:prod && bunx @vscode/vsce package --no-dependencies --skip-license"
+  },
+  "devDependencies": {
+    "@types/node": "^20.14.0",
+    "@types/vscode": "^1.90.0",
+    "esbuild": "^0.21.5",
+    "typescript": "^5.4.5"
+  }
+}
