@@ -24,9 +24,9 @@ Build customized, high-utility VS Code extensions for personal use and developer
 2. `quotadeck` (`QuotaDeck — AI Usage & Limits`, renamed from `ai-usage-monitor`): Monitors exact quotas for **Antigravity** (`5h` + `Weekly` via `agy` CLI), **Claude Code** (Anthropic OAuth Usage API), and **Codex** (`~/.codex/auth.json` → `chatgpt.com/backend-api/wham/usage`). Includes global **Left / Used** toggle (`quotadeck.displayMode`), configurable inline **Status Bar Visibility** (`quotadeck.statusBarProviders`), friendly `<= 20%` warning color, Adaptive Backoff Polling (`1x -> 2x -> 4x`, max 30m), Provider-First List/Grid Dashboard with Sort/Filter + collapsible `Usage History`, and `256x256` `resources/icon.png`.
 
 ## Next Steps
-- **Completed (`quotadeck` Provider-First Main UI & Public Rename — 2026-11-26)**:
-  1. Elevated the clean **Providers** sidebar view to be the single **Main UI** (removed cluttered KPI ring strip, search box, heavy nested `.window-card` boxes, and redundant side drawer).
-  2. Renamed extension cleanly to `quotadeck` (`QuotaDeck — AI Usage & Limits`, `extensions/quotadeck`, `quotadeck.*` settings & commands) ready for public Marketplace release.
-  3. Kept `List | Grid` layout toggle, `Left | Used` global toggle, Provider/Status filters, Sort (`Grouped`, `Tightest First`, `Most Available`, `Soonest Reset`, `Name A–Z`), inline Status Bar `Bar` switch per pool, and collapsible `Usage History`.
-  4. Verified `tsc --noEmit`, `bun test`, `bun run compile`, `package` (`quotadeck-0.1.1.vsix`), cross-platform hardening (Windows/Linux/macOS), and published to Open VSX Registry.
-- **Planned (Upcoming)**: Discuss & implement Custom CLI/HTTP Providers per `extensions/quotadeck/specs/future-providers-plan.md`.
+- **Completed (`quotadeck` v0.2.0 Phase 2 — Wave 1 Official APIs & Custom Providers — 2026-11-26)**:
+  1. Added `SecretStore` (`src/secrets.ts`) + `quotadeck.connectProvider` / `quotadeck.disconnectProvider` commands and Dashboard `Connect` / `Disconnect` buttons.
+  2. Implemented `OpenRouterProvider`, `DeepSeekProvider`, `ClineProvider`, and `CustomProviderRunner` (`quotadeck.customProviders` HTTP `https`/`localhost` + CLI `execFile` + prototype-safe `extractJsonPath`).
+  3. Extended `StatusBarController` and `DashboardPanel` to display `$` balances alongside `%` quotas and optional `quotadeck.budgets` percentage caps.
+  4. Verified `tsc --noEmit`, `bun test` (41 pass, 0 fail), `bun run package` (`quotadeck-0.2.0.vsix`), and local `code --install-extension --force`.
+- **Planned (Upcoming)**: Optional Wave 2 providers (e.g. GitHub Copilot / Cursor) if requested.

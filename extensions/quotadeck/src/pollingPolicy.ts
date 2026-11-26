@@ -7,7 +7,7 @@ export function computeQuotaSignature(snapshots: ProviderSnapshot[]): string {
   return snapshots
     .map((s) => {
       const pools = s.pools
-        .map((p) => `${p.id}:${p.remainingPct}:${p.fiveHourPct ?? ''}:${p.weeklyPct ?? ''}`)
+        .map((p) => `${p.id}:${p.remainingPct ?? ''}:${p.fiveHourPct ?? ''}:${p.weeklyPct ?? ''}:${p.balanceAmount ?? ''}`)
         .join(',');
       return `${s.id}=${s.status}[${pools}]`;
     })

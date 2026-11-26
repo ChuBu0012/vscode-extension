@@ -165,7 +165,7 @@ export class CodexProvider implements QuotaProvider {
           id: this.id,
           shortCode: 'CX',
           name: 'Codex',
-          status: 'unavailable',
+          status: 'not_connected',
           sourceKind: 'Unavailable',
           pools: [],
           note: 'Sign in to Codex to enable usage tracking',

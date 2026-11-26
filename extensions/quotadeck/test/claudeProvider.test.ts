@@ -56,12 +56,12 @@ describe('ClaudeCodeProvider & parseClaudeUsageResponse', () => {
     expect(snap.pools[0].remainingPct).toBe(70);
   });
 
-  it('returns unavailable when credentials are missing or expired (401)', async () => {
+  it('returns not_connected when credentials are missing and unavailable when expired (401)', async () => {
     const noCreds = new ClaudeCodeProvider({
       loadCredentials: async () => null,
     });
     const s1 = await noCreds.fetchSnapshot(defaultConfig);
-    expect(s1.status).toBe('unavailable');
+    expect(s1.status).toBe('not_connected');
 
     const expired = new ClaudeCodeProvider({
       loadCredentials: async () => ({ accessToken: 'tok', expiresAt: Date.now() + 60_000 }),

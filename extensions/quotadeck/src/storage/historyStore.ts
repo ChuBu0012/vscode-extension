@@ -53,7 +53,9 @@ export class HistoryStore {
   }
 
   private async performAppend(snapshots: ProviderSnapshot[]): Promise<void> {
-    const live = snapshots.filter((s) => s.status === 'live' && s.pools.length > 0);
+    const live = snapshots.filter(
+      (s) => s.status === 'live' && s.pools.some((p) => typeof p.remainingPct === 'number')
+    );
     if (live.length === 0) {
       return;
     }

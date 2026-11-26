@@ -1,49 +1,82 @@
-# Technical Plan — `quotadeck`
+# Technical Plan — `quotadeck` (Phase 2: Official APIs & Custom Providers)
 
-## 1. Architecture & Module Boundaries
+## 1. Architecture & Target Module Layout
 ```
-src/
-├── extension.ts               # Activation, wiring, polling timer, commands, strict disposal
-├── config.ts                  # Typed config reader + input sanitization/validation
-├── calibration.ts             # Pure, testable 7d -> 5h cap estimation logic
-├── types.ts                   # Domain types + computeRemainingPct / averageRemainingPct
+extensions/quotadeck/src/
+├── extension.ts                     # Activation, SecretStorage wiring, connect/disconnect commands, polling
+├── config.ts                        # Read quotadeck.* settings (budgets, customProviders, dynamic statusBarProviders)
+├── configValidation.ts              # Sanitize polling interval, budget caps, and customProviders schema
+├── secrets.ts                       # [NEW] Typed wrapper over vscode.SecretStorage (get/set/delete/has)
+├── timeFormat.ts                    # Timestamp parsing & human countdown formatting
+├── types.ts                         # Extended ModelPoolSnapshot, ProviderSnapshot, BudgetConfig, CustomProviderConfig
+├── pollingPolicy.ts                 # Adaptive backoff (1x -> 2x -> 4x) & reset-aware wakeup
 ├── providers/
-│   ├── claudeProvider.ts      # Async JSONL scanner (~/.claude/projects) with injectable baseDir
-│   ├── codexProvider.ts       # Async JSONL scanner (~/.codex/sessions) with injectable baseDir
-│   └── antigravityProvider.ts # Async agy CLI + transcript scanner with injectable deps
+│   ├── antigravityProvider.ts       # Existing local agy CLI provider
+│   ├── claudeProvider.ts            # Existing Anthropic OAuth usage provider
+│   ├── codexProvider.ts             # Existing Codex wham/usage provider
+│   ├── openRouterProvider.ts        # [NEW] GET /api/v1/key & /api/v1/credits
+│   ├── deepSeekProvider.ts          # [NEW] GET /user/balance
+│   ├── clineProvider.ts             # [NEW] GET /api/v1/users/me/plan/usage-limits & balance
+│   └── customProviderRunner.ts      # [NEW] Safe HTTP/CLI custom provider executor + prototype-safe JSONPath
 ├── storage/
-│   └── historyStore.ts        # Serialized NDJSON append + compaction + safe readRecent
+│   └── historyStore.ts              # NDJSON snapshot store + Windows-safe compaction
 └── ui/
-    ├── statusBar.ts           # Right StatusBarItem + MarkdownString tooltip
-    └── dashboardPanel.ts      # WebviewPanel, strict CSP, validated messaging, Design.md UI
+    ├── statusBar.ts                 # Dynamic status bar formatting (% and $ balance) + Markdown tooltip
+    └── dashboardPanel.ts            # Provider-first List/Grid Webview + Balance rendering + Connect/Disconnect actions
 ```
 
-## 2. Key Technical Improvements & Hardening
-1. **Testability via Dependency Injection**:
-   - `ClaudeCodeProvider(baseDir?)`, `CodexProvider(baseDir?)`, `AntigravityProvider(options?)` accept optional paths/fetchers defaulting to `os.homedir()` and `execFile('agy', ['models'])`.
-   - Extract `calibrateCapsFromSnapshots` into `src/calibration.ts` as a pure function.
-2. **Accurate Rolling Window & Memory Safety**:
-   - In `ClaudeCodeProvider`, filter individual JSONL entries by `parsed.timestamp` when present (falling back to file `mtimeMs` if absent) so multi-day session files don't inflate the 5h window.
-   - In `AntigravityProvider`, cap or safely inspect large `transcript.jsonl` files without crashing on huge buffers, and use case-insensitive matching for `claude` / `hydrogen`.
-3. **HistoryStore Compaction & Serialization**:
-   - Queue writes sequentially via a promise chain to prevent interleaved NDJSON lines.
-   - Compact `history.ndjson` when line count exceeds `MAX_HISTORY_LINES` (2000), keeping the most recent 2000 entries.
-   - Validate parsed `HistoryPoint` objects in `readRecent`.
-4. **Webview & Message Security**:
-   - Validate all incoming Webview messages (`saveCaps` finite positive integers clamped to `[1000, 100_000_000]`, `changeWindow` clamped to `[1, 720]`).
-   - Track `onDidReceiveMessage` and `onDidDispose` disposables inside `DashboardPanel` and dispose them on panel close/extension dispose.
-   - Remove dead duplicate `#settingsModal` DOM elements so all IDs are unique.
-5. **UI Parity with `Design.md` & Mockup**:
-   - Add Top Nav Tabs (`Overview`, `Settings`), `⌘K` Search/Filter input, `Recent` / `24h` / `7d` history range selector, interactive chart popover, `Recent Sessions` / `All Model Pools` segmented list, Reset Countdown footer, active preset pill highlighting, and calibration status feedback.
+---
 
-## 3. Verification Strategy
-- **Unit Tests (`bun test`)**:
-  - `test/claudeProvider.test.ts`
-  - `test/codexProvider.test.ts`
-  - `test/antigravityProvider.test.ts`
-  - `test/historyStore.test.ts`
-  - `test/calibration.test.ts`
-  - `test/typesAndConfig.test.ts`
-- **Typecheck**: `./extensions/quotadeck/node_modules/.bin/tsc -p extensions/quotadeck/tsconfig.json --noEmit`
-- **Bundle**: `bun run --cwd extensions/quotadeck compile` & `compile:prod`
-- **Package**: `bun run --cwd extensions/quotadeck package` (`.vsix` generation, then clean up `.vsix` if untracked/not meant to be committed per `rules.md`).
+## 2. Key Technical Design Decisions
+
+### 2.1 Dynamic Status Bar Keys & Backward Compatibility
+- Change `StatusBarProviderKey` from a closed union to `string` while preserving default `['agy-gemini', 'claude', 'codex']`.
+- In `package.json`, change `quotadeck.statusBarProviders.items` from strict `enum` to `type: "string"` (with `examples` or description documenting built-ins + `custom:<id>`), so VS Code doesn't show schema validation warnings when users pin `openrouter`, `deepseek`, `cline`, or `custom:*`.
+- Map `(providerId, poolId)` → `statusBarKey` cleanly via a single helper shared/aligned between `StatusBarController` and `DashboardPanel`:
+  - `agy` / `agy-gemini` → `agy-gemini` (`AGY: G`)
+  - `agy` / `agy-claude` → `agy-claude` (`AGY-C`)
+  - `claude` / `claude-main` → `claude` (`CL`)
+  - `codex` / `codex-main` → `codex` (`CX`)
+  - `openrouter` / `openrouter-main` → `openrouter` (`OR`)
+  - `deepseek` / `deepseek-main` → `deepseek` (`DS`)
+  - `cline` / `cline-main` → `cline` (`CN`)
+  - `custom:<id>` → `custom:<id>` (shortCode uppercase)
+
+### 2.2 Balance & Budget Cap Formatting
+- Pure helper `formatPoolMetric(pool, mode, budgetCapUsd?)` (testable independently):
+  - If `pool.remainingPct` is a number (either native `%` or computed from `budgetCapUsd`):
+    - Returns `{ kind: 'pct', value: 0..100, isLow: remainingPct <= 20 }`.
+  - Else if `pool.balanceAmount` is a number:
+    - Returns `{ kind: 'balance', formatted: formatCurrency(balanceAmount, balanceCurrency), isLow: balanceAmount <= 1 }`.
+- `HistoryStore`: Only records numeric `remainingPct` for providers that have a percentage (`typeof remainingPct === 'number'`); balance-only providers without a budget cap do not skew the percentage history average.
+
+### 2.3 `SecretStorage` & Onboarding Flow
+- `SecretStore` keys:
+  - `quotadeck.key.openrouter`
+  - `quotadeck.key.deepseek`
+  - `quotadeck.key.cline`
+  - `quotadeck.secret.<customId>` (for custom providers)
+- In `DashboardPanel`:
+  - Providers returning `status: 'not_connected'` render cleanly in a subtle secondary row (or under `All` tab) with a crisp `Connect` button (`data-connect-provider`).
+  - Clicking `Connect` sends `{ command: 'connectProvider', providerId }` → `extension.ts` runs `connectProviderFlow(providerId)` using `vscode.window.showInputBox({ password: true, prompt: ... })` → saves to `SecretStorage` → refreshes immediately.
+  - Note: Never keep `showInformationMessage` popups; show status directly in the Dashboard and Status Bar.
+
+### 2.4 Custom Provider Security & Validation
+- `sanitizeCustomProviders(raw)` in `configValidation.ts`:
+  - Validates `id` (`/^[a-z0-9][a-z0-9-_]{0,31}$/`), `name`, `shortCode` (1–4 chars), `kind` (`'http' | 'cli'`).
+  - For `'http'`: parses via `new URL(url)` and enforces `protocol === 'https:'` OR (`protocol === 'http:'` and `hostname === 'localhost' || hostname === '127.0.0.1' || hostname === '::1'`).
+  - For `'cli'`: splits or executes `command` + `args[]` via `execFile` (`windowsHide: true`, timeout clamped `[1000, 15000]`). Never uses shell interpolation on untrusted arguments.
+- `extractJsonPath(root, dotPath)`:
+  - Splits `dotPath` by `.` and iterates safely, rejecting `__proto__`, `constructor`, `prototype`, and supporting numeric array indices (`balance_infos.0.total_balance`).
+
+### 2.5 Testing & Verification Strategy
+- **Unit tests (`bun test`)** using dependency injection (mock `fetch`, mock `SecretStore`, mock `execFile`):
+  - `test/openRouterProvider.test.ts`: key with limit, unlimited key + credits, budget cap override, 401/network fallback, missing key (`not_connected`).
+  - `test/deepSeekProvider.test.ts`: USD/CNY balance parsing, `is_available: false`, optional `budgetCapUsd` percentage calculation, 401/402 handling.
+  - `test/clineProvider.test.ts`: 5h/weekly usage limits, pay-as-you-go balance fallback, 401/network handling.
+  - `test/customProviderRunner.test.ts`: URL protocol validation (`https` vs remote `http` rejected, `localhost` allowed), prototype-pollution-safe `extractJsonPath`, `percentage` / `used_percentage` / `balance_usd` extraction, CLI timeout & error handling.
+  - `test/uiAndExtension.test.ts`: Balance display (`$10.00`), `Connect` button message flow, dynamic Status Bar text (`OR $4.50 | DS $10.00`).
+- **Build & Packaging**:
+  - `bunx tsc --noEmit`
+  - `bun test`
+  - `bun run compile` & `bun run package`

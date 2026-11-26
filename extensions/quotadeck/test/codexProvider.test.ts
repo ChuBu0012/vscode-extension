@@ -59,9 +59,9 @@ describe('CodexProvider & parseCodexUsageResponse', () => {
     expect(snap.pools[0].remainingPct).toBe(80);
   });
 
-  it('returns unavailable on missing credentials or 401, and falls back to cache on transient failure', async () => {
+  it('returns not_connected on missing credentials, and falls back to cache on transient failure', async () => {
     const noCreds = new CodexProvider({ loadCredentials: async () => null });
-    expect((await noCreds.fetchSnapshot(defaultConfig)).status).toBe('unavailable');
+    expect((await noCreds.fetchSnapshot(defaultConfig)).status).toBe('not_connected');
 
     let fail = false;
     const provider = new CodexProvider({

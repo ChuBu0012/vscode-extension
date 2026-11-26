@@ -7,6 +7,9 @@ export interface DashboardCallbacks {
   onRefresh: () => Promise<void>;
   onClearHistory: () => Promise<void>;
   onUpdateConfig?: (key: 'displayMode' | 'statusBarProviders', value: unknown) => Promise<void>;
+  onConnectProvider?: (providerId?: string) => Promise<string | void>;
+  onDisconnectProvider?: (providerId: string) => Promise<void>;
+  onRemoveCustomProvider?: (providerId: string) => Promise<void>;
 }
 
 export class DashboardPanel implements vscode.Disposable {
@@ -64,6 +67,31 @@ export class DashboardPanel implements vscode.Disposable {
           if ((key === 'displayMode' || key === 'statusBarProviders') && this.callbacks.onUpdateConfig) {
             await this.callbacks.onUpdateConfig(key, message.value);
           }
+        } else if (message.command === 'connectProvider') {
+          let notice: string | void = undefined;
+          try {
+            if (this.callbacks.onConnectProvider) {
+              notice = await this.callbacks.onConnectProvider(typeof message.providerId === 'string' ? message.providerId : undefined);
+            }
+          } finally {
+            this.postActionDone(typeof notice === 'string' ? notice : undefined);
+          }
+        } else if (message.command === 'disconnectProvider') {
+          try {
+            if (typeof message.providerId === 'string' && this.callbacks.onDisconnectProvider) {
+              await this.callbacks.onDisconnectProvider(message.providerId);
+            }
+          } finally {
+            this.postActionDone();
+          }
+        } else if (message.command === 'removeCustomProvider') {
+          try {
+            if (typeof message.providerId === 'string' && this.callbacks.onRemoveCustomProvider) {
+              await this.callbacks.onRemoveCustomProvider(message.providerId);
+            }
+          } finally {
+            this.postActionDone();
+          }
         } else if (message.command === 'ready') {
           this.postState();
         }
@@ -86,6 +114,10 @@ export class DashboardPanel implements vscode.Disposable {
     if (this.panel) {
       this.postState();
     }
+  }
+
+  private postActionDone(notice?: string): void {
+    this.panel?.webview.postMessage({ command: 'actionDone', notice });
   }
 
   private postState(): void {
@@ -121,7 +153,9 @@ export class DashboardPanel implements vscode.Disposable {
       .filter((s) => s.status === 'live')
       .flatMap((s) => s.pools.map((p) => ({ ...p, providerId: s.id, providerName: s.name })));
 
-    const lowest = [...allPools].sort((a, b) => a.remainingPct - b.remainingPct)[0];
+    const lowest = [...allPools]
+      .filter((p) => typeof p.remainingPct === 'number')
+      .sort((a, b) => (a.remainingPct ?? 0) - (b.remainingPct ?? 0))[0];
     const soonestReset = [...allPools]
       .filter((p) => typeof p.nextResetMs === 'number')
       .sort((a, b) => (a.nextResetMs ?? Infinity) - (b.nextResetMs ?? Infinity))[0];
@@ -240,6 +274,7 @@ export class DashboardPanel implements vscode.Disposable {
       gap: 0.35rem;
     }
     .btn:hover { border-color: var(--accent); }
+    .btn:disabled, .btn-ghost:disabled { opacity: 0.65; cursor: wait; }
     .btn-primary {
       background: var(--accent);
       color: var(--accent-fg);
@@ -667,6 +702,13 @@ export class DashboardPanel implements vscode.Disposable {
         <button type="button" class="mode-btn active" id="modeLeftBtn" data-mode="remaining">Left</button>
         <button type="button" class="mode-btn" id="modeUsedBtn" data-mode="used">Used</button>
       </div>
+      <button type="button" class="btn" id="addAgentBtn" title="Add API key or custom agent endpoint">
+        <svg class="btn-icon" id="addAgentBtnIcon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+          <line x1="8" y1="3" x2="8" y2="13"/>
+          <line x1="3" y1="8" x2="13" y2="8"/>
+        </svg>
+        <span id="addAgentBtnLabel">Add Agent</span>
+      </button>
       <button type="button" class="btn btn-primary" id="refreshBtn" title="Refresh all provider quotas">
         <svg class="btn-icon" id="refreshBtnIcon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
           <path d="M13.5 8a5.5 5.5 0 1 1-1.4-3.67"/>
@@ -682,6 +724,7 @@ export class DashboardPanel implements vscode.Disposable {
       <div class="board-title-group">
         <h1 class="page-title">Providers</h1>
         <span class="meta-time" id="updatedAt">Loading...</span>
+        <span class="meta-time" id="actionNotice" aria-live="polite"></span>
       </div>
       <div class="board-controls">
         <select class="select-control" id="limitSortSelect" aria-label="Sort quota pools" title="Sort quota pools">
@@ -854,6 +897,33 @@ export class DashboardPanel implements vscode.Disposable {
       historyHeaderBar.addEventListener('click', toggleHistorySection);
     }
 
+    let pendingAction = null;
+    let noticeTimer = null;
+
+    const setActionNotice = (text, autoClearMs) => {
+      if (noticeTimer) {
+        clearTimeout(noticeTimer);
+        noticeTimer = null;
+      }
+      const el = document.getElementById('actionNotice');
+      if (el) el.textContent = text ? '· ' + text : '';
+      if (text && autoClearMs) {
+        noticeTimer = setTimeout(() => {
+          noticeTimer = null;
+          if (el) el.textContent = '';
+        }, autoClearMs);
+      }
+    };
+
+    const setAddAgentVisual = (loading) => {
+      const btn = document.getElementById('addAgentBtn');
+      const lbl = document.getElementById('addAgentBtnLabel');
+      const icon = document.getElementById('addAgentBtnIcon');
+      if (btn) btn.disabled = loading;
+      if (lbl) lbl.textContent = loading ? 'Adding...' : 'Add Agent';
+      if (icon) icon.classList.toggle('spin', loading);
+    };
+
     const setRefreshVisual = (loading) => {
       const lbl = document.getElementById('refreshBtnLabel');
       const btn = document.getElementById('refreshBtn');
@@ -867,6 +937,16 @@ export class DashboardPanel implements vscode.Disposable {
       setRefreshVisual(true);
       vscode.postMessage({ command: 'refresh' });
     });
+
+    const addAgentBtn = document.getElementById('addAgentBtn');
+    if (addAgentBtn) {
+      addAgentBtn.addEventListener('click', () => {
+        pendingAction = { type: 'add' };
+        setAddAgentVisual(true);
+        setActionNotice('Opening Add Agent prompt...');
+        vscode.postMessage({ command: 'connectProvider' });
+      });
+    }
 
     document.getElementById('clearHistoryBtn').addEventListener('click', (ev) => {
       if (ev && typeof ev.stopPropagation === 'function') ev.stopPropagation();
@@ -907,14 +987,27 @@ export class DashboardPanel implements vscode.Disposable {
       }
       if (providerId === 'claude' && poolId === 'claude-main') return 'claude';
       if (providerId === 'codex' && poolId === 'codex-main') return 'codex';
+      if (providerId === 'openrouter' && poolId === 'openrouter-main') return 'openrouter';
+      if (providerId === 'deepseek' && poolId === 'deepseek-main') return 'deepseek';
+      if (providerId === 'cline' && poolId === 'cline-main') return 'cline';
+      if (providerId.startsWith('custom:')) return providerId;
       return null;
     };
-    const getStatusBarTag = (sbKey) => {
+    const getStatusBarTag = (sbKey, shortCode) => {
       if (sbKey === 'agy-gemini') return 'AGY: G';
       if (sbKey === 'agy-claude') return 'AGY-C';
       if (sbKey === 'claude') return 'CL';
       if (sbKey === 'codex') return 'CX';
-      return '';
+      if (sbKey === 'openrouter') return 'OR';
+      if (sbKey === 'deepseek') return 'DS';
+      if (sbKey === 'cline') return 'CN';
+      return (shortCode || sbKey).toUpperCase();
+    };
+    const formatMoney = (amount, currency) => {
+      const safe = Number.isFinite(Number(amount)) ? Number(amount) : 0;
+      const cur = (currency || 'USD').toUpperCase();
+      const sym = (cur === 'CNY' || cur === 'RMB') ? '¥' : (cur === 'EUR' ? '€' : (cur === 'GBP' ? '£' : '$'));
+      return sym + safe.toFixed(2);
     };
 
     function renderBars(history) {
@@ -1005,10 +1098,12 @@ export class DashboardPanel implements vscode.Disposable {
       };
       const activeSb = getActiveSbSet(config);
 
-      if (activeProviderFilter !== 'all' && !snapshots.some((s) => s.id === activeProviderFilter)) {
+      const visibleSnapshots = snapshots.filter((s) => s.status !== 'not_connected');
+
+      if (activeProviderFilter !== 'all' && !visibleSnapshots.some((s) => s.id === activeProviderFilter)) {
         activeProviderFilter = 'all';
       }
-      if (historyProviderFilter !== 'all' && !snapshots.some((s) => s.id === historyProviderFilter)) {
+      if (historyProviderFilter !== 'all' && !visibleSnapshots.some((s) => s.id === historyProviderFilter)) {
         historyProviderFilter = 'all';
       }
 
@@ -1030,20 +1125,20 @@ export class DashboardPanel implements vscode.Disposable {
 
       if (historyProviderSelect) {
         historyProviderSelect.innerHTML = ['<option value="all">All Providers</option>'].concat(
-          snapshots.map((s) => '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>')
+          visibleSnapshots.map((s) => '<option value="' + esc(s.id) + '">' + esc(s.name) + '</option>')
         ).join('');
         historyProviderSelect.value = historyProviderFilter;
       }
 
-      const liveProviders = snapshots.filter((s) => s.status === 'live' && s.pools.length > 0);
+      const liveProviders = visibleSnapshots.filter((s) => s.status === 'live' && s.pools.length > 0);
       const allLivePools = liveProviders.flatMap((s) =>
         s.pools.map((pl) => ({ ...pl, providerId: s.id, providerName: s.name, shortCode: s.shortCode }))
       );
 
       // Provider Filter Tabs
       const tabsEl = document.getElementById('providerFilterTabs');
-      const filterItems = [{ id: 'all', label: 'All (' + snapshots.length + ')', status: 'all' }].concat(
-        snapshots.map((s) => ({ id: s.id, label: s.name, status: s.status }))
+      const filterItems = [{ id: 'all', label: 'All (' + visibleSnapshots.length + ')', status: 'all' }].concat(
+        visibleSnapshots.map((s) => ({ id: s.id, label: s.name, status: s.status }))
       );
       tabsEl.innerHTML = filterItems.map((item) => {
         const dot = item.id === 'all'
@@ -1061,9 +1156,10 @@ export class DashboardPanel implements vscode.Disposable {
 
       // Status Filter Chips (concise: All, Low, Status Bar)
       const lowCount = allLivePools.filter((p) =>
-        p.remainingPct <= 20 ||
+        (typeof p.remainingPct === 'number' && p.remainingPct <= 20) ||
         (typeof p.fiveHourPct === 'number' && p.fiveHourPct <= 20) ||
-        (typeof p.weeklyPct === 'number' && p.weeklyPct <= 20)
+        (typeof p.weeklyPct === 'number' && p.weeklyPct <= 20) ||
+        (typeof p.remainingPct !== 'number' && typeof p.balanceAmount === 'number' && p.balanceAmount <= 1)
       ).length;
       const pinnedCount = allLivePools.filter((p) => activeSb.has(getStatusBarKey(p.providerId, p.id))).length;
       const chipsEl = document.getElementById('statusFilterChips');
@@ -1085,26 +1181,32 @@ export class DashboardPanel implements vscode.Disposable {
         });
       }
 
-      const renderSbSwitch = (sbKey, poolName, remainingPct) => {
+      const renderSbSwitch = (sbKey, pool, shortCode) => {
         if (!sbKey) return '';
         const isOn = activeSb.has(sbKey);
-        const tag = getStatusBarTag(sbKey);
-        const valStr = fmtVal(remainingPct) + '%';
+        const tag = getStatusBarTag(sbKey, shortCode);
+        const valStr = typeof pool.remainingPct === 'number'
+          ? (fmtVal(pool.remainingPct) + '%')
+          : (typeof pool.balanceAmount === 'number' ? formatMoney(pool.balanceAmount, pool.balanceCurrency) : '');
         const tip = isOn
           ? 'Shown in Status Bar as "' + tag + ' ' + valStr + '" (click to hide)'
           : 'Hidden from Status Bar (click to show as "' + tag + '")';
-        return '<button type="button" class="sb-switch-btn' + (isOn ? ' active' : '') + '" role="switch" aria-checked="' + (isOn ? 'true' : 'false') + '" aria-label="Show ' + esc(poolName) + ' in Status Bar" title="' + esc(tip) + '" data-sb-toggle="' + esc(sbKey) + '">' +
+        return '<button type="button" class="sb-switch-btn' + (isOn ? ' active' : '') + '" role="switch" aria-checked="' + (isOn ? 'true' : 'false') + '" aria-label="Show ' + esc(pool.name) + ' in Status Bar" title="' + esc(tip) + '" data-sb-toggle="' + esc(sbKey) + '">' +
           '<span class="sb-switch-label">Bar</span>' +
           '<span class="sb-switch-track"><span class="sb-switch-thumb"></span></span>' +
         '</button>';
       };
 
       const renderPoolItem = (s, pl, isFlat) => {
-        const barVal = fmtVal(pl.remainingPct);
-        const unitSuffix = isUsedGlobal ? '% used' : '%';
+        const hasPct = typeof pl.remainingPct === 'number';
+        const hasBal = typeof pl.balanceAmount === 'number';
+        const barVal = hasPct ? fmtVal(pl.remainingPct) : 0;
+        const valText = hasPct
+          ? (barVal + (isUsedGlobal ? '% used' : '%'))
+          : (hasBal ? formatMoney(pl.balanceAmount, pl.balanceCurrency) : '--');
         const sbKey = getStatusBarKey(s.id, pl.id);
-        const sbSwitchHtml = renderSbSwitch(sbKey, pl.name, pl.remainingPct);
-        const isWarn = pl.remainingPct <= 20;
+        const sbSwitchHtml = renderSbSwitch(sbKey, pl, s.shortCode);
+        const isWarn = hasPct ? (pl.remainingPct <= 20) : (hasBal && pl.balanceAmount <= 1);
 
         const hasFiveH = typeof pl.fiveHourPct === 'number';
         const hasWeekly = typeof pl.weeklyPct === 'number';
@@ -1114,6 +1216,11 @@ export class DashboardPanel implements vscode.Disposable {
         }
         if (hasFiveH) metaParts.push('5h ' + fmtVal(pl.fiveHourPct) + '%');
         if (hasWeekly) metaParts.push('Weekly ' + fmtVal(pl.weeklyPct) + '%');
+        if (hasBal && typeof pl.budgetCapAmount === 'number') {
+          metaParts.push(formatMoney(pl.balanceAmount, pl.balanceCurrency) + ' / ' + formatMoney(pl.budgetCapAmount, pl.balanceCurrency) + ' cap');
+        } else if (hasBal && !hasPct) {
+          metaParts.push((pl.balanceCurrency || 'USD') + ' balance');
+        }
         const resetLbl = pl.nextResetLabel && pl.nextResetLabel !== '--'
           ? pl.nextResetLabel
           : (pl.fiveHourResetLabel || pl.fiveHourReset || pl.weeklyResetLabel || pl.weeklyReset || '');
@@ -1122,6 +1229,7 @@ export class DashboardPanel implements vscode.Disposable {
         const tooltipParts = [s.name + ' · ' + pl.name];
         if (hasFiveH) tooltipParts.push('5h: ' + pl.fiveHourPct + '% left (' + (100 - pl.fiveHourPct) + '% used)');
         if (hasWeekly) tooltipParts.push('Weekly: ' + pl.weeklyPct + '% left (' + (100 - pl.weeklyPct) + '% used)');
+        if (hasBal) tooltipParts.push('Balance: ' + formatMoney(pl.balanceAmount, pl.balanceCurrency));
         if (pl.fiveHourReset) tooltipParts.push('5h reset: ' + pl.fiveHourReset);
         if (pl.weeklyReset) tooltipParts.push('Weekly reset: ' + pl.weeklyReset);
 
@@ -1129,24 +1237,29 @@ export class DashboardPanel implements vscode.Disposable {
           ? '<span class="provider-code-pill" title="' + esc(s.name) + '">' + esc(s.shortCode) + '</span>'
           : '';
 
+        const trackHtml = hasPct
+          ? '<div class="q-track"><div class="q-fill' + (isWarn ? ' warn' : '') + '" style="width:' + barVal + '%"></div></div>'
+          : '';
+
         return '<div class="pool-item' + (isFlat ? ' flat-pool' : '') + '" title="' + esc(tooltipParts.join(' | ')) + '">' +
           '<div class="pool-head">' +
             '<div class="pool-name-group">' + providerPill + '<span class="pool-name">' + esc(pl.name) + '</span></div>' +
             '<div class="pool-head-right">' +
-              '<span class="pool-val' + (isWarn ? ' warn' : '') + '">' + barVal + unitSuffix + '</span>' +
+              '<span class="pool-val' + (isWarn ? ' warn' : '') + '">' + esc(valText) + '</span>' +
               sbSwitchHtml +
             '</div>' +
           '</div>' +
-          '<div class="q-track"><div class="q-fill' + (isWarn ? ' warn' : '') + '" style="width:' + barVal + '%"></div></div>' +
+          trackHtml +
           (metaParts.length > 0 ? '<div class="pool-meta">' + esc(metaParts.join(' · ')) + '</div>' : '') +
         '</div>';
       };
 
       const poolMatchesFilter = (s, pl) => {
         if (activeStatusFilter === 'low') {
-          return pl.remainingPct <= 20 ||
+          return (typeof pl.remainingPct === 'number' && pl.remainingPct <= 20) ||
             (typeof pl.fiveHourPct === 'number' && pl.fiveHourPct <= 20) ||
-            (typeof pl.weeklyPct === 'number' && pl.weeklyPct <= 20);
+            (typeof pl.weeklyPct === 'number' && pl.weeklyPct <= 20) ||
+            (typeof pl.remainingPct !== 'number' && typeof pl.balanceAmount === 'number' && pl.balanceAmount <= 1);
         }
         if (activeStatusFilter === 'pinned') {
           const sbKey = getStatusBarKey(s.id, pl.id);
@@ -1155,17 +1268,28 @@ export class DashboardPanel implements vscode.Disposable {
         return true;
       };
 
+      const isKeyProvider = (id) => id === 'openrouter' || id === 'deepseek' || id === 'cline';
+      const isCustomProvider = (id) => id.startsWith('custom:');
+
       const providerScoped = activeProviderFilter === 'all'
-        ? snapshots
-        : snapshots.filter((s) => s.id === activeProviderFilter);
+        ? visibleSnapshots
+        : visibleSnapshots.filter((s) => s.id === activeProviderFilter);
 
       const breakdownEl = document.getElementById('quotaBreakdown');
       const blocks = [];
 
       const appendNonLiveBlock = (p) => {
         if (activeStatusFilter !== 'all') return;
-        const badge = p.status === 'coming_soon' ? 'Coming soon' : 'Unavailable';
-        const sub = p.status === 'coming_soon' ? 'Not yet configured' : (p.note || 'Unavailable');
+        const badge = p.status === 'not_connected'
+          ? 'Not connected'
+          : (p.status === 'coming_soon' ? 'Coming soon' : 'Unavailable');
+        const sub = p.status === 'coming_soon'
+          ? 'Not yet configured'
+          : (p.note || (p.status === 'not_connected' ? 'Connect API key to enable' : 'Unavailable'));
+        const isBusyConnect = Boolean(pendingAction && pendingAction.type === 'connect' && pendingAction.providerId === p.id);
+        const actionHtml = p.requiresConnect
+          ? '<button type="button" class="btn-ghost" data-connect-provider="' + esc(p.id) + '"' + (isBusyConnect ? ' disabled' : '') + '>' + (isBusyConnect ? 'Connecting...' : 'Connect') + '</button>'
+          : '<span class="badge-soon">' + esc(badge) + '</span>';
         blocks.push(
           '<div class="provider-block">' +
             '<div class="provider-row">' +
@@ -1173,7 +1297,7 @@ export class DashboardPanel implements vscode.Disposable {
                 '<div class="pr-icon">' + esc(p.shortCode) + '</div>' +
                 '<div><div class="pr-name">' + esc(p.name) + '</div><div class="pr-sub">' + esc(sub) + '</div></div>' +
               '</div>' +
-              '<span class="badge-soon">' + esc(badge) + '</span>' +
+              actionHtml +
             '</div>' +
           '</div>'
         );
@@ -1188,9 +1312,25 @@ export class DashboardPanel implements vscode.Disposable {
           const matchedPools = p.pools.filter((pl) => poolMatchesFilter(p, pl));
           if (matchedPools.length === 0) continue;
 
-          const avg = Math.round(matchedPools.reduce((s, pl) => s + pl.remainingPct, 0) / matchedPools.length);
-          const headVal = fmtVal(avg) + (isUsedGlobal ? '% used' : '%');
-          const headWarn = avg <= 20 ? ' warn' : '';
+          const numericPools = matchedPools.filter((pl) => typeof pl.remainingPct === 'number');
+          let headVal = '';
+          let headWarn = '';
+          if (numericPools.length > 0) {
+            const avg = Math.round(numericPools.reduce((s, pl) => s + pl.remainingPct, 0) / numericPools.length);
+            headVal = fmtVal(avg) + (isUsedGlobal ? '% used' : '%');
+            headWarn = avg <= 20 ? ' warn' : '';
+          } else if (typeof matchedPools[0].balanceAmount === 'number') {
+            headVal = formatMoney(matchedPools[0].balanceAmount, matchedPools[0].balanceCurrency);
+            headWarn = matchedPools[0].balanceAmount <= 1 ? ' warn' : '';
+          }
+
+          const isBusyDisconnect = Boolean(pendingAction && pendingAction.type === 'disconnect' && pendingAction.providerId === p.id);
+          const isBusyRemove = Boolean(pendingAction && pendingAction.type === 'remove' && pendingAction.providerId === p.id);
+          const disconnectBtn = isKeyProvider(p.id)
+            ? '<button type="button" class="btn-ghost" data-disconnect-provider="' + esc(p.id) + '" title="Remove API key from SecretStorage"' + (isBusyDisconnect ? ' disabled' : '') + '>' + (isBusyDisconnect ? 'Disconnecting...' : 'Disconnect') + '</button>'
+            : (isCustomProvider(p.id)
+              ? '<button type="button" class="btn-ghost" data-remove-custom="' + esc(p.id) + '" title="Remove custom provider"' + (isBusyRemove ? ' disabled' : '') + '>' + (isBusyRemove ? 'Removing...' : 'Remove') + '</button>'
+              : '');
           const poolsHtml = matchedPools.map((pl) => renderPoolItem(p, pl, false)).join('');
 
           blocks.push(
@@ -1200,7 +1340,10 @@ export class DashboardPanel implements vscode.Disposable {
                   '<div class="pr-icon">' + esc(p.shortCode) + '</div>' +
                   '<div><div class="pr-name">' + esc(p.name) + '</div><div class="pr-sub">' + esc(p.sourceKind) + '</div></div>' +
                 '</div>' +
-                '<span class="pr-pct' + headWarn + '">' + headVal + '</span>' +
+                '<div class="pool-head-right">' +
+                  disconnectBtn +
+                  '<span class="pr-pct' + headWarn + '">' + esc(headVal) + '</span>' +
+                '</div>' +
               '</div>' +
               '<div class="pool-list">' + poolsHtml + '</div>' +
             '</div>'
@@ -1220,14 +1363,17 @@ export class DashboardPanel implements vscode.Disposable {
           }
         }
 
+        const pctScore = (pl) => typeof pl.remainingPct === 'number' ? pl.remainingPct : Number.MAX_SAFE_INTEGER;
         flatItems.sort((a, b) => {
           if (limitSort === 'lowest') {
-            const diff = a.pl.remainingPct - b.pl.remainingPct;
+            const diff = pctScore(a.pl) - pctScore(b.pl);
             if (diff !== 0) return diff;
             return (a.pl.nextResetMs ?? Number.MAX_SAFE_INTEGER) - (b.pl.nextResetMs ?? Number.MAX_SAFE_INTEGER);
           }
           if (limitSort === 'highest') {
-            return b.pl.remainingPct - a.pl.remainingPct;
+            const aVal = typeof a.pl.remainingPct === 'number' ? a.pl.remainingPct : -1;
+            const bVal = typeof b.pl.remainingPct === 'number' ? b.pl.remainingPct : -1;
+            return bVal - aVal;
           }
           if (limitSort === 'reset') {
             return (a.pl.nextResetMs ?? Number.MAX_SAFE_INTEGER) - (b.pl.nextResetMs ?? Number.MAX_SAFE_INTEGER);
@@ -1244,20 +1390,36 @@ export class DashboardPanel implements vscode.Disposable {
       }
 
       if (blocks.length === 0) {
-        breakdownEl.innerHTML = '<div class="empty-state">' +
-          '<div>No providers or pools match this filter.</div>' +
-          '<button type="button" class="btn-ghost" id="resetFiltersBtn">Reset Filters</button>' +
-        '</div>';
-        const resetBtn = document.getElementById('resetFiltersBtn');
-        if (resetBtn) {
-          resetBtn.addEventListener('click', () => {
-            activeProviderFilter = 'all';
-            activeStatusFilter = 'all';
-            limitSort = 'default';
-            if (limitSortSelect) limitSortSelect.value = 'default';
-            saveViewState({ providerFilter: 'all', statusFilter: 'all', limitSort: 'default' });
-            renderAll();
-          });
+        if (visibleSnapshots.length === 0) {
+          breakdownEl.innerHTML = '<div class="empty-state">' +
+            '<div>No AI providers detected or connected yet.</div>' +
+            '<button type="button" class="btn-ghost" id="emptyAddAgentBtn">+ Add Agent</button>' +
+          '</div>';
+          const emptyAddBtn = document.getElementById('emptyAddAgentBtn');
+          if (emptyAddBtn) {
+            emptyAddBtn.addEventListener('click', () => {
+              pendingAction = { type: 'add' };
+              setAddAgentVisual(true);
+              setActionNotice('Opening Add Agent prompt...');
+              vscode.postMessage({ command: 'connectProvider' });
+            });
+          }
+        } else {
+          breakdownEl.innerHTML = '<div class="empty-state">' +
+            '<div>No providers or pools match this filter.</div>' +
+            '<button type="button" class="btn-ghost" id="resetFiltersBtn">Reset Filters</button>' +
+          '</div>';
+          const resetBtn = document.getElementById('resetFiltersBtn');
+          if (resetBtn) {
+            resetBtn.addEventListener('click', () => {
+              activeProviderFilter = 'all';
+              activeStatusFilter = 'all';
+              limitSort = 'default';
+              if (limitSortSelect) limitSortSelect.value = 'default';
+              saveViewState({ providerFilter: 'all', statusFilter: 'all', limitSort: 'default' });
+              renderAll();
+            });
+          }
         }
       } else {
         breakdownEl.innerHTML = blocks.join('');
@@ -1277,6 +1439,39 @@ export class DashboardPanel implements vscode.Disposable {
             renderAll();
           });
         });
+        breakdownEl.querySelectorAll('[data-connect-provider]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const pid = btn.getAttribute('data-connect-provider');
+            if (!pid) return;
+            pendingAction = { type: 'connect', providerId: pid };
+            btn.disabled = true;
+            btn.textContent = 'Connecting...';
+            setActionNotice('Connecting ' + pid + '...');
+            vscode.postMessage({ command: 'connectProvider', providerId: pid });
+          });
+        });
+        breakdownEl.querySelectorAll('[data-disconnect-provider]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const pid = btn.getAttribute('data-disconnect-provider');
+            if (!pid) return;
+            pendingAction = { type: 'disconnect', providerId: pid };
+            btn.disabled = true;
+            btn.textContent = 'Disconnecting...';
+            setActionNotice('Disconnecting ' + pid + '...');
+            vscode.postMessage({ command: 'disconnectProvider', providerId: pid });
+          });
+        });
+        breakdownEl.querySelectorAll('[data-remove-custom]').forEach((btn) => {
+          btn.addEventListener('click', () => {
+            const pid = btn.getAttribute('data-remove-custom');
+            if (!pid) return;
+            pendingAction = { type: 'remove', providerId: pid };
+            btn.disabled = true;
+            btn.textContent = 'Removing...';
+            setActionNotice('Removing custom provider...');
+            vscode.postMessage({ command: 'removeCustomProvider', providerId: pid });
+          });
+        });
       }
 
       renderBars(history);
@@ -1284,7 +1479,19 @@ export class DashboardPanel implements vscode.Disposable {
 
     window.addEventListener('message', (event) => {
       const msg = event.data;
-      if (!msg || msg.command !== 'state') return;
+      if (!msg) return;
+      if (msg.command === 'actionDone') {
+        pendingAction = null;
+        setAddAgentVisual(false);
+        if (msg.notice) {
+          setActionNotice(msg.notice, 5000);
+        } else {
+          setActionNotice('');
+        }
+        if (lastPayload) renderAll();
+        return;
+      }
+      if (msg.command !== 'state') return;
       lastPayload = msg.payload;
       renderAll();
     });

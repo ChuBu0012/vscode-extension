@@ -226,7 +226,7 @@ export class ClaudeCodeProvider implements QuotaProvider {
           id: this.id,
           shortCode: 'CL',
           name: 'Claude Code',
-          status: 'unavailable',
+          status: 'not_connected',
           sourceKind: 'Unavailable',
           pools: [],
           note: 'Sign in to Claude Code to enable usage tracking',

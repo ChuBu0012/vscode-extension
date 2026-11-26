@@ -1,41 +1,131 @@
-# Specification — `quotadeck`
+# Specification — `quotadeck` (QuotaDeck — AI Usage & Limits)
+
+> **Version**: v0.2.0 Target (Phase 2: Official REST API Providers & Custom Providers)
+> **Baseline**: v0.1.1 (Published on Open VSX as `pornput-s.quotadeck`)
+
+---
 
 ## 1. Overview
-`quotadeck` (QuotaDeck — AI Usage & Limits) is a VS Code extension that monitors usage limits and remaining model-pool quotas across local AI coding tools (**Claude Code**, **Codex**, and **Antigravity**) without requiring external API keys or causing notification spam.
+`quotadeck` is a cross-platform VS Code / Open VSX extension that monitors **5-hour / weekly quota limits** and **credit balances** across local AI coding tools and cloud AI APIs without exposing secrets in settings or spamming notifications.
+
+### Baseline Providers (Implemented in v0.1.x)
+1. **Antigravity (`agy`)**: Local `agy /usage` CLI (cross-platform `.cmd`/`.exe` + Unix path discovery).
+2. **Claude Code (`claude`)**: Anthropic OAuth Usage API using macOS Keychain or `~/.claude/.credentials.json` (`CLAUDE_CONFIG_DIR`).
+3. **Codex (`codex`)**: OpenAI Wham Usage API using `~/.codex/auth.json` (`CODEX_HOME`).
+
+### Phase 2 Goals (Aligned via `/grill-me`)
+1. **Hybrid Provider Expansion**:
+   - **Wave 1 Built-in Official REST APIs**: **OpenRouter**, **DeepSeek**, and **Cline / ClinePass**.
+   - **Extensible Custom Providers (`quotadeck.customProviders`)**: User-defined HTTP JSON endpoints or local CLI commands with JSONPath/dot-path extraction.
+2. **Balance + Optional Budget Cap Model**:
+   - Support dollar-balance providers (`$10.00` remaining) natively alongside percentage-window providers (`5h` / `Weekly`).
+   - Support optional `budgetCapUsd` per credit provider so users can compute `% remaining`, view progress bars, and trigger `<= 20%` low-balance warnings.
+3. **Secure Key Onboarding (`vscode.SecretStorage`)**:
+   - Never store API keys or tokens in `settings.json`.
+   - Provide inline `Connect` / `Disconnect` actions on unconfigured/connected provider rows and Command Palette commands (`quotadeck.connectProvider`, `quotadeck.disconnectProvider`).
+
+---
 
 ## 2. Functional Requirements
 
-### FR-1: Quota Providers (Non-Blocking Local Inspection)
-- **FR-1.1 (`ClaudeCodeProvider`)**: Scans `~/.claude/projects/**/*.jsonl` within the configured rolling window (`windowHours`). Parses per-turn `message.usage` (`input_tokens`, `output_tokens`, `cache_creation_input_tokens`, and 10% weighted `cache_read_input_tokens`) and timestamps when available, separating `Standard (Sonnet)` and `Fable / Opus` pools. Falls back to byte-size estimation (`bytes / 12`) if `usage` is absent.
-- **FR-1.2 (`CodexProvider`)**: Recursively scans `~/.codex/sessions/**/*.jsonl` (bounded depth) within `windowHours` and estimates token usage (`bytes / 14`) into the `Standard Pool`.
-- **FR-1.3 (`AntigravityProvider`)**: Queries `agy models` (cached for 10 minutes, 3s timeout, graceful fallback if CLI missing) and scans `~/.gemini/antigravity/brain/*/.system_generated/logs/transcript.jsonl` within `windowHours`, separating `Gemini Pool` and `Claude Pool`.
-- **FR-1.4 (Transparency & Graceful Degradation)**: Every provider returns `sourceKind: 'Exact' | 'Est.'`, `available: boolean`, and `note` when local directories are missing. Missing directories never throw unhandled errors.
+### FR-1: Wave 1 Built-in Official REST API Providers
 
-### FR-2: History Persistence (`HistoryStore`)
-- **FR-2.1**: Appends `HistoryPoint` snapshots to `history.ndjson` inside `context.globalStorageUri.fsPath`.
-- **FR-2.2**: Serializes concurrent writes and compacts `history.ndjson` when exceeding `MAX_HISTORY_LINES` (2000) so disk usage remains bounded.
-- **FR-2.3**: `readRecent(limit)` safely skips malformed NDJSON lines and invalid structures.
+#### FR-1.1: OpenRouter (`openrouter`)
+- **Primary Endpoint**: `GET https://openrouter.ai/api/v1/key` with `Authorization: Bearer <API_KEY>` (10s timeout via `AbortController`).
+- **Optional Account Credits**: If user provides a Management/Provisioning key or `/key` returns account info, optionally query `GET https://openrouter.ai/api/v1/credits` for overall `total_credits` and `total_usage`.
+- **Quota / Balance Mapping**:
+  - When key `limit` is present (`typeof limit === 'number' && limit > 0`):
+    - `remainingUsd = Math.max(0, limit - usage)`
+    - `budgetCapUsd = limit`
+    - `remainingPct = Math.round((remainingUsd / limit) * 100)`
+  - When `limit` is `null` (unlimited key):
+    - Use `credits` remaining balance (`$X.XX`) if available, or show `usage` (`$Y.YY used`) + optional user-configured `quotadeck.budgets.openrouter` (`budgetCapUsd`) to compute `remainingPct`.
+- **Degradation**: Missing key → `status: 'not_connected'` (or `'unavailable'` with `requiresConnect: true` & `Connect` action button). HTTP `401`/`403` → prompt re-connect without stale cache; transient `5xx`/network error → fallback to last cached snapshot.
 
-### FR-3: Calibration & Configuration
-- **FR-3.1**: `calibrateCapsFromSnapshots(weekSnapshots)` estimates 5h window caps from 7-day (168h) local usage (`(used7d / 14) * 1.25` rounded to nearest 10,000, clamped to provider floor).
-- **FR-3.2**: Configuration (`pollingIntervalSeconds`, `windowHours`, `caps.*`) is validated and sanitized before persisting to VS Code Global settings.
+#### FR-1.2: DeepSeek (`deepseek`)
+- **Endpoint**: `GET https://api.deepseek.com/user/balance` with `Authorization: Bearer <API_KEY>`.
+- **Response Mapping**:
+  - Read `is_available` and `balance_infos` (sum or primary currency entry e.g. `USD`: `total_balance`, `granted_balance`, `topped_up_balance`).
+  - Format `balanceText` (e.g., `$10.00` or `¥50.00` matching `currency`).
+  - If user configured `quotadeck.budgets.deepseek` (`> 0`), compute `remainingPct = clamp(round((totalBalance / budgetCap) * 100), 0, 100)` and enable progress bar + `<= 20%` warning.
+  - If no budget cap is configured (`budgetCapUsd` unset), show exact balance (`$10.00`) without faking a percentage bar (`hasPercentage = false`, `isAvailable = true/false`).
+- **Degradation**: Missing key → `Connect` action; HTTP `401`/`403` → invalid key message; `402` / `is_available: false` → `Balance depleted ($0.00)`.
 
-### FR-4: Status Bar (`StatusBarController`)
-- **FR-4.1**: Displays compact glanceable summary on `vscode.StatusBarAlignment.Right`: `$(pulse) AI: C <pct>% | X <pct>% | A <pct>%`.
-- **FR-4.2**: Hover tooltip (`MarkdownString`, `isTrusted = false`) lists per-provider, per-pool remaining %, token usage (`k`), and `Est.`/`Exact` source tag.
-- **FR-4.3**: Clicking opens or reveals the Dashboard Webview.
+#### FR-1.3: Cline / ClinePass (`cline`)
+- **Endpoints**:
+  - `GET https://api.cline.bot/api/v1/users/me/plan/usage-limits` (5h, weekly, monthly utilization/limits for ClinePass).
+  - `GET https://api.cline.bot/api/v1/users/me` → `GET https://api.cline.bot/api/v1/users/{id}/balance` (pay-as-you-go balance when applicable).
+- **Quota Mapping**:
+  - Map 5h / weekly / monthly windows into `ModelPoolSnapshot` (`fiveHourPct`, `fiveHourReset`, `weeklyPct`, `weeklyReset`, `remainingPct` via `effectiveRemainingPct`).
+  - If pay-as-you-go balance is returned alongside or instead of subscription limits, attach `balanceUsd` + optional `quotadeck.budgets.cline`.
+- **Degradation**: Missing token → `Connect` action; `401`/`403` → expired/invalid token; transient network errors → cached snapshot fallback.
 
-### FR-5: Webview Dashboard (`DashboardPanel`) — Parity with `Design.md` & Mockup
-- **FR-5.1**: **Top Navigation Strip**: Brand mark, view tabs (`Overview`, `Settings`), Search/Filter input (`⌘K` / `Ctrl+K` shortcut) filtering providers, pools, and sessions, Side Panel toggle (`Hide Panel` / `Show Panel`), and `Refresh` action.
-- **FR-5.2**: **3-Cell Hairline KPI Strip**: Active Model Pools (with provider count), Lowest Pool Remaining % (with pool name & reset window), and Estimated Window Tokens (with active window label). Uses `tabular-nums`.
-- **FR-5.3**: **Capacity Bar Chart + History Range Selector**: Supports switching chart range (`Recent`, `24h`, `7d`) and interactive hover/click popover showing exact timestamp, remaining %, and token usage.
-- **FR-5.4**: **Bottom Segmented List**: Switches between `Recent Sessions` and `All Model Pools`, respecting the active search filter.
-- **FR-5.5**: **Right Inspector Column**: Displays `Providers & Model Pools` with SVG icons, `Est.`/`Exact` badge, `4px` pool progress bars, and a **Reset Countdown / Window Footer** showing next window reset estimate and quick `Configure` button.
-- **FR-5.6**: **Settings & Plan Limits View**: Auto-Calibrate (`Sync from Logs` with status feedback), Plan Preset pills (highlighting active matching preset), external official usage links (allowlisted `https://claude.ai/` and `https://chatgpt.com/`), and collapsible Advanced Custom Token Caps form (no duplicate DOM IDs).
+---
+
+### FR-2: Extensible Custom Providers (`quotadeck.customProviders`)
+Users can define custom HTTP JSON or CLI providers in `settings.json`:
+```jsonc
+"quotadeck.customProviders": [
+  {
+    "id": "my-gateway",
+    "name": "My LLM Gateway",
+    "shortCode": "GW",
+    "kind": "http",               // "http" | "cli"
+    "url": "https://gateway.example.com/v1/usage",
+    "method": "GET",              // optional, default "GET"
+    "headers": { "X-Custom": "1" },
+    "secretKey": "quotadeck.secret.my-gateway", // optional SecretStorage key injected as Bearer token or {{SECRET}}
+    "valueType": "percentage",    // "percentage" | "used_percentage" | "balance_usd"
+    "valuePath": "data.remaining_pct",
+    "resetPath": "data.resets_at",
+    "budgetCapUsd": 25
+  }
+]
+```
+- **Security Constraints for Custom Providers**:
+  - `http` kind: Only allow `https://` URLs (and `http://localhost` / `http://127.0.0.1` for local tools like Ollama/local proxies). Reject arbitrary `http://` remote URLs with clear validation note.
+  - `cli` kind: Execute via `execFile` (no arbitrary shell injection on Unix; `windowsHide: true`, configurable timeout capped at `15000ms`), parsing stdout JSON via `valuePath` / `resetPath` or regex.
+  - Safe dot-path extractor (`extractJsonPath(obj, path)`): Pure, prototype-pollution-safe (`__proto__`, `constructor`, `prototype` blocked).
+  - `secretKey`: If configured, read from `vscode.SecretStorage` and attach via `Authorization: Bearer <secret>` (or replace `{{SECRET}}` in headers only, never in URLs or logs).
+
+---
+
+### FR-3: Unified Data Model & UI Presentation
+- Extend `ModelPoolSnapshot`:
+  - `remainingPct?: number` (when percentage or `budgetCapUsd` exists)
+  - `balanceAmount?: number`
+  - `balanceCurrency?: string` (e.g. `'USD'`, `'CNY'`)
+  - `budgetCapAmount?: number`
+  - `requiresAuth?: boolean` (for providers awaiting `Connect`)
+- **Provider-First Dashboard UI**:
+  - Preserve the clean hairline List/Grid layout (`Design.md`).
+  - **Percentage / Capped pools**: Render `%` + progress bar + `5h / Weekly / Resets ...` metadata line + `Bar` Status Bar toggle.
+  - **Uncapped Balance pools**: Render `$10.00` (tabular-nums) + subtle `Balance · Set budget cap in settings for % bar` (or clean `USD balance`) + `Bar` Status Bar toggle (Status Bar shows e.g. `DS $10.00` or `OR $4.50`!).
+  - **Unconnected Key-Based Providers**:
+    - Do not clutter the top of the active list if the user hasn't connected them—render a clean compact row at the bottom (or under `Not Connected` / `Connect` chip) with a crisp `Connect` button (`data-connect-provider="..."`).
+    - Connected providers render a subtle `Key` / `Disconnect` action in the provider header or Command Palette.
+- **Status Bar (`StatusBarController`)**:
+  - Generalize `statusBarProviders` from a fixed 4-item enum to `string[]` (supporting `'agy-gemini'`, `'agy-claude'`, `'claude'`, `'codex'`, `'openrouter'`, `'deepseek'`, `'cline'`, and custom provider IDs `'custom:<id>'`).
+  - Format status text cleanly:
+    - Percentage pools: `AGY: G 93%`, `CL 50%`, `CX 10%`, `CN 80%`
+    - Balance pools: `OR $4.50` (or `OR 45%` if capped), `DS $10.00` (or `DS 50%` if capped)
+    - Warning highlight (`<= 20%` remaining) applies to percentage-based and budget-capped pools; uncapped `$` balance pools warn when `balanceAmount <= 1` (or `=== 0`).
+
+---
+
+### FR-4: Secret Management & Commands
+- **New Commands**:
+  - `quotadeck.connectProvider`: QuickPick to choose provider (`OpenRouter`, `DeepSeek`, `Cline`, or configured Custom Provider secret) → `showInputBox({ password: true, ignoreFocusOut: true })` → store in `context.secrets.store(...)` → trigger immediate refresh.
+  - `quotadeck.disconnectProvider`: QuickPick to choose connected provider → `context.secrets.delete(...)` → refresh.
+- **Webview Actions**:
+  - Clicking `Connect` on a provider row posts `{ command: 'connectProvider', providerId }` to extension host (never collects secrets inside Webview HTML inputs).
+  - Clicking `Disconnect` posts `{ command: 'disconnectProvider', providerId }`.
+
+---
 
 ## 3. Non-Functional Requirements & Invariants
-- **NFR-1 (Webview Security)**: Strict CSP (`default-src 'none'`, `script-src 'nonce-<nonce>'`, `style-src ${webview.cspSource} 'unsafe-inline'`), input validation on all Webview → Extension messages, HTML escaping on all dynamic strings.
-- **NFR-2 (Extension Host Isolation)**: 100% async file I/O (`fs/promises`) and async child process (`execFile` with timeout).
-- **NFR-3 (Strict Disposal)**: All VS Code disposables (`StatusBarItem`, `WebviewPanel`, `onDidReceiveMessage`, `onDidDispose`, `onDidChangeConfiguration`, polling timer, `OutputChannel`) pushed to `context.subscriptions` or disposed cleanly on panel close.
-- **NFR-4 (No Notification Spam / No Decorative Emojis)**: Zero `showInformationMessage` popups; zero decorative emojis; crisp SVG icons in Webview and Codicons in Status Bar.
-- **NFR-5 (Progressive Disclosure)**: Primary UI shows `% remaining` and reset window; raw file paths and exact token counts appear in hover tooltips only.
+- **NFR-1 (Zero Secrets in Settings/Logs/Git)**: API keys live exclusively in `vscode.SecretStorage`; never logged to `OutputChannel` or echoed in error messages.
+- **NFR-2 (Cross-Platform)**: Works identically on macOS, Linux, Windows, and WSL (no native SQLite/C++ addons, `AbortController` timeouts on all HTTP calls, `windowsHide: true` on CLI calls).
+- **NFR-3 (Strict Webview Security)**: CSP `default-src 'none'`, cryptographic `nonce`, HTML escaping on all user-defined strings (including custom provider names, currencies, notes).
+- **NFR-4 (Low Cognitive Load)**: Unconnected key-based providers never flood the Status Bar or show error popups; they wait quietly until connected.
+- **NFR-5 (Strict Disposal)**: All new commands, secret-change listeners, and disposables pushed to `context.subscriptions`.

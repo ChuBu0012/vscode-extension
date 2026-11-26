@@ -494,6 +494,64 @@ describe('StatusBarController & DashboardPanel & extension.ts', () => {
     expect(lastCreatedPanel!.disposed).toBe(true);
   });
 
+  it('DashboardPanel shows loading state for Add Agent and Disconnect and resets on actionDone', async () => {
+    const panel = new DashboardPanel({
+      onRefresh: async () => {},
+      onClearHistory: async () => {},
+      onConnectProvider: async () => {},
+      onDisconnectProvider: async () => {},
+    });
+
+    const connectedSnaps: ProviderSnapshot[] = [
+      {
+        id: 'openrouter',
+        shortCode: 'OR',
+        name: 'OpenRouter',
+        status: 'live',
+        sourceKind: 'Exact',
+        pools: [{ id: 'openrouter-main', name: 'OpenRouter Credits', remainingPct: 75, balanceAmount: 15 }],
+      },
+    ];
+
+    panel.show(connectedSnaps, [], sampleConfig);
+    const dom = createMockDom(lastCreatedPanel!.webview.html);
+    dom.mockWindow.dispatchMessage({
+      command: 'state',
+      payload: {
+        snapshots: connectedSnaps,
+        history: [],
+        config: sampleConfig,
+        summary: { liveCount: 1, totalCount: 1, lowestPct: 75, lowestLabel: 'OpenRouter Credits' },
+        updatedAt: '15:15:00',
+      },
+    });
+
+    const addBtn = dom.elements.get('addAgentBtn')!;
+    addBtn.dispatch('click');
+    expect(addBtn.disabled).toBe(true);
+    expect(dom.elements.get('addAgentBtnLabel')!.textContent).toBe('Adding...');
+    expect(dom.elements.get('actionNotice')!.textContent).toContain('Opening Add Agent prompt');
+
+    dom.mockWindow.dispatchMessage({ command: 'actionDone' });
+    expect(addBtn.disabled).toBe(false);
+    expect(dom.elements.get('addAgentBtnLabel')!.textContent).toBe('Add Agent');
+    expect(dom.elements.get('actionNotice')!.textContent).toBe('');
+
+    const disconnectBtn = dom.elements.get('quotaBreakdown')!.querySelectorAll('[data-disconnect-provider="openrouter"]')[0];
+    expect(disconnectBtn).toBeTruthy();
+    disconnectBtn.dispatch('click');
+    expect(disconnectBtn.disabled).toBe(true);
+    expect(disconnectBtn.textContent).toBe('Disconnecting...');
+    expect(dom.sentMessages).toContainEqual({ command: 'disconnectProvider', providerId: 'openrouter' });
+
+    dom.mockWindow.dispatchMessage({ command: 'actionDone', notice: 'Codex not found — Sign in to Codex' });
+    expect(dom.elements.get('actionNotice')!.textContent).toContain('Codex not found');
+    const resetDisconnectBtn = dom.elements.get('quotaBreakdown')!.querySelectorAll('[data-disconnect-provider="openrouter"]')[0];
+    expect(resetDisconnectBtn.textContent).not.toBe('Disconnecting...');
+
+    panel.dispose();
+  });
+
   it('DashboardPanel supports sorting, status filters, search, inline status bar toggle, and used-mode history', async () => {
     const panel = new DashboardPanel({
       onRefresh: async () => {},
@@ -607,6 +665,42 @@ describe('StatusBarController & DashboardPanel & extension.ts', () => {
     expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('Claude (Pro)');
     expect(dom.elements.get('quotaBreakdown')!.innerHTML).not.toContain('Codex (Free)');
 
+    // Balance-only provider & not_connected provider render cleanly with Connect / Status Bar balance
+    dom.mockWindow.dispatchMessage({
+      command: 'state',
+      payload: {
+        snapshots: [
+          {
+            id: 'deepseek',
+            shortCode: 'DS',
+            name: 'DeepSeek',
+            status: 'live',
+            sourceKind: 'Exact',
+            pools: [{ id: 'deepseek-main', name: 'DeepSeek Balance', balanceAmount: 10.5, balanceCurrency: 'USD' }],
+          },
+          {
+            id: 'openrouter',
+            shortCode: 'OR',
+            name: 'OpenRouter',
+            status: 'not_connected',
+            sourceKind: 'Not connected',
+            requiresConnect: true,
+            pools: [],
+            note: 'Connect your OpenRouter API key to track credits',
+          },
+        ],
+        history: [],
+        config: { ...sampleConfig, displayMode: 'remaining', statusBarProviders: ['deepseek'] },
+        summary: { liveCount: 1, totalCount: 2 },
+        updatedAt: '14:45:00',
+      },
+    });
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('$10.50');
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).not.toContain('OpenRouter');
+    expect(dom.elements.get('providerFilterTabs')!.innerHTML).not.toContain('OpenRouter');
+    dom.elements.get('addAgentBtn')!.dispatch('click');
+    expect(dom.sentMessages).toContainEqual({ command: 'connectProvider' });
+
     panel.dispose();
   });
 
@@ -619,10 +713,18 @@ describe('StatusBarController & DashboardPanel & extension.ts', () => {
       subscriptions,
       globalStorageUri: { fsPath: tmpStorage, toString: () => tmpStorage },
       extensionUri: { fsPath: tmpStorage, toString: () => tmpStorage },
+      secrets: {
+        get: async () => undefined,
+        store: async () => {},
+        delete: async () => {},
+        onDidChange: () => ({ dispose: () => {} }),
+      },
     } as never);
 
     expect(registeredCommands.has('quotadeck.openDashboard')).toBe(true);
     expect(registeredCommands.has('quotadeck.refresh')).toBe(true);
+    expect(registeredCommands.has('quotadeck.connectProvider')).toBe(true);
+    expect(registeredCommands.has('quotadeck.disconnectProvider')).toBe(true);
 
     await registeredCommands.get('quotadeck.openDashboard')!();
     expect(lastCreatedPanel).not.toBeNull();

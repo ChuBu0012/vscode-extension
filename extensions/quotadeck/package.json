@@ -1,8 +1,8 @@
 {
   "name": "quotadeck",
   "displayName": "QuotaDeck — AI Usage & Limits",
-  "description": "Track exact 5-hour and weekly usage quotas across Antigravity, Claude Code, and Codex right in your VS Code Status Bar and minimalist Dashboard.",
-  "version": "0.1.1",
+  "description": "Track exact 5-hour/weekly quotas and credit balances across Antigravity, Claude Code, Codex, OpenRouter, DeepSeek, Cline, and custom endpoints.",
+  "version": "0.2.0",
   "publisher": "pornput-s",
   "author": {
     "name": "pornput.s"
@@ -59,6 +59,16 @@
         "command": "quotadeck.clearHistory",
         "title": "Clear History",
         "category": "QuotaDeck"
+      },
+      {
+        "command": "quotadeck.connectProvider",
+        "title": "Add Agent / Provider API Key",
+        "category": "QuotaDeck"
+      },
+      {
+        "command": "quotadeck.disconnectProvider",
+        "title": "Disconnect Provider API Key",
+        "category": "QuotaDeck"
       }
     ],
     "configuration": {
@@ -80,11 +90,58 @@
         "quotadeck.statusBarProviders": {
           "type": "array",
           "items": {
-            "type": "string",
-            "enum": ["agy-gemini", "agy-claude", "claude", "codex"]
+            "type": "string"
           },
           "default": ["agy-gemini", "claude", "codex"],
-          "description": "Which provider quotas to show in the Status Bar."
+          "description": "Which provider quotas to show in the Status Bar (e.g. 'agy-gemini', 'agy-claude', 'claude', 'codex', 'openrouter', 'deepseek', 'cline', or 'custom:<id>')."
+        },
+        "quotadeck.budgets": {
+          "type": "object",
+          "default": {},
+          "properties": {
+            "openrouter": {
+              "type": "number",
+              "minimum": 0.01,
+              "description": "Optional USD budget cap for OpenRouter to compute remaining percentage."
+            },
+            "deepseek": {
+              "type": "number",
+              "minimum": 0.01,
+              "description": "Optional USD budget cap for DeepSeek to compute remaining percentage."
+            },
+            "cline": {
+              "type": "number",
+              "minimum": 0.01,
+              "description": "Optional USD budget cap for Cline balance to compute remaining percentage."
+            }
+          },
+          "description": "Optional USD budget caps per balance-based provider for calculating percentage bars and low-balance warnings."
+        },
+        "quotadeck.customProviders": {
+          "type": "array",
+          "default": [],
+          "items": {
+            "type": "object",
+            "required": ["id", "name", "kind", "valuePath"],
+            "properties": {
+              "id": { "type": "string" },
+              "name": { "type": "string" },
+              "shortCode": { "type": "string" },
+              "kind": { "type": "string", "enum": ["http", "cli"] },
+              "url": { "type": "string" },
+              "method": { "type": "string", "enum": ["GET", "POST"] },
+              "headers": { "type": "object" },
+              "command": { "type": "string" },
+              "args": { "type": "array", "items": { "type": "string" } },
+              "timeoutMs": { "type": "number" },
+              "secretKey": { "type": "string" },
+              "valueType": { "type": "string", "enum": ["percentage", "used_percentage", "balance_usd"] },
+              "valuePath": { "type": "string" },
+              "resetPath": { "type": "string" },
+              "budgetCapUsd": { "type": "number" }
+            }
+          },
+          "description": "Custom HTTP JSON or CLI usage providers."
         }
       }
     }

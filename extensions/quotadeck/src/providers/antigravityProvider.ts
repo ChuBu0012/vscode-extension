@@ -146,14 +146,16 @@ export class AntigravityProvider implements QuotaProvider {
           note: `Showing cached data (${err instanceof Error ? err.message : 'agy CLI failed'})`,
         };
       }
+      const errCode = (err as { code?: string })?.code;
+      const isNotInstalled = errCode === 'ENOENT' || (err instanceof Error && err.message === 'agy CLI not found');
       return {
         id: this.id,
         shortCode: 'AG',
         name: 'Antigravity',
-        status: 'unavailable',
+        status: isNotInstalled ? 'not_connected' : 'unavailable',
         sourceKind: 'Unavailable',
         pools: [],
-        note: err instanceof Error ? err.message : 'agy CLI unavailable',
+        note: isNotInstalled ? 'agy CLI not installed' : (err instanceof Error ? err.message : 'agy CLI unavailable'),
       };
     }
   }

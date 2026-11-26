@@ -74,4 +74,17 @@ describe('AntigravityProvider & parseAgyUsageOutput', () => {
     expect(cached.status).toBe('live');
     expect(cached.note).toContain('Showing cached data');
   });
+
+  it('returns not_connected when agy CLI is not installed (ENOENT)', async () => {
+    const provider = new AntigravityProvider({
+      fetchUsageOutput: async () => {
+        const err = new Error('spawn agy ENOENT');
+        (err as { code?: string }).code = 'ENOENT';
+        throw err;
+      },
+    });
+    const snap = await provider.fetchSnapshot(cfg);
+    expect(snap.status).toBe('not_connected');
+    expect(snap.pools).toHaveLength(0);
+  });
 });
