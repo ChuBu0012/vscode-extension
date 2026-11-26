@@ -3,20 +3,23 @@
   "displayName": "QuotaDeck — AI Usage & Limits",
   "description": "Track exact 5-hour and weekly usage quotas across Antigravity, Claude Code, and Codex right in your VS Code Status Bar and minimalist Dashboard.",
   "version": "0.1.0",
-  "publisher": "most-too",
+  "publisher": "pornput-s",
+  "author": {
+    "name": "pornput.s"
+  },
   "icon": "resources/icon.png",
   "galleryBanner": {
     "color": "#0e1726",
     "theme": "dark"
   },
-  "homepage": "https://github.com/most-too/vscode-extension#readme",
+  "homepage": "https://github.com/ChuBu0012/vscode-extension#readme",
   "bugs": {
-    "url": "https://github.com/most-too/vscode-extension/issues"
+    "url": "https://github.com/ChuBu0012/vscode-extension/issues"
   },
   "qna": "marketplace",
   "repository": {
     "type": "git",
-    "url": "https://github.com/most-too/vscode-extension"
+    "url": "https://github.com/ChuBu0012/vscode-extension"
   },
   "license": "MIT",
   "keywords": [

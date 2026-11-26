@@ -8,7 +8,7 @@ Build customized, high-utility VS Code extensions for personal use and developer
 - **Package Manager**: Bun (`bun` v1.3.1).
 - **Runtime / Bundler**: TypeScript (ES2022 / Node16) + esbuild.
 - **Packaging**: `@vscode/vsce` producing `.vsix` artifacts.
-- **Publisher**: `most-too`.
+- **Publisher**: `pornput-s` (`author`: `pornput.s`).
 
 ## Current State
 - Monorepo infrastructure established.
