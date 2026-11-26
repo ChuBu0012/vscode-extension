@@ -32,13 +32,20 @@ export function activate(context: vscode.ExtensionContext): void {
   let currentPollDelayMs = readMonitorConfig().pollingIntervalSeconds * 1000;
   let pollingTimer: ReturnType<typeof setTimeout> | undefined;
   let configDebounceTimer: ReturnType<typeof setTimeout> | undefined;
+  let disposed = false;
 
   const scheduleNextPoll = () => {
+    if (disposed) {
+      return;
+    }
     if (pollingTimer) {
       clearTimeout(pollingTimer);
     }
     pollingTimer = setTimeout(() => {
       pollingTimer = undefined;
+      if (disposed) {
+        return;
+      }
       if (vscode.window.state.focused) {
         void refreshAll(true, false);
       } else {
@@ -172,6 +179,7 @@ export function activate(context: vscode.ExtensionContext): void {
 
   context.subscriptions.push({
     dispose: () => {
+      disposed = true;
       if (pollingTimer) {
         clearTimeout(pollingTimer);
         pollingTimer = undefined;

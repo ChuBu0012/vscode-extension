@@ -125,7 +125,8 @@ async function readCredentialsFromMacKeychain(): Promise<ClaudeCredentials | nul
 
 async function readCredentialsFromFile(): Promise<ClaudeCredentials | null> {
   try {
-    const credPath = path.join(os.homedir(), '.claude', '.credentials.json');
+    const claudeDir = process.env.CLAUDE_CONFIG_DIR?.trim() || path.join(os.homedir(), '.claude');
+    const credPath = path.join(claudeDir, '.credentials.json');
     const raw = await fs.readFile(credPath, 'utf8');
     const parsed = JSON.parse(raw) as {
       claudeAiOauth?: {
@@ -151,9 +152,14 @@ async function readCredentialsFromFile(): Promise<ClaudeCredentials | null> {
 async function defaultLoadCredentials(): Promise<ClaudeCredentials | null> {
   if (process.platform === 'darwin') {
     const kc = await readCredentialsFromMacKeychain();
-    if (kc) {
+    if (kc && (!kc.expiresAt || Date.now() < kc.expiresAt)) {
       return kc;
     }
+    const fileCreds = await readCredentialsFromFile();
+    if (fileCreds) {
+      return fileCreds;
+    }
+    return kc;
   }
   return readCredentialsFromFile();
 }

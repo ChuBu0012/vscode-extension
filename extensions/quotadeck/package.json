@@ -2,7 +2,7 @@
   "name": "quotadeck",
   "displayName": "QuotaDeck — AI Usage & Limits",
   "description": "Track exact 5-hour and weekly usage quotas across Antigravity, Claude Code, and Codex right in your VS Code Status Bar and minimalist Dashboard.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "publisher": "pornput-s",
   "author": {
     "name": "pornput.s"
@@ -36,7 +36,8 @@
     "vscode": "^1.90.0"
   },
   "categories": [
-    "Other"
+    "Other",
+    "Visualization"
   ],
   "main": "./dist/extension.js",
   "activationEvents": [

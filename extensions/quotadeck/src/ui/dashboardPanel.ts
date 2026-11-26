@@ -999,7 +999,10 @@ export class DashboardPanel implements vscode.Disposable {
       const { snapshots, history, config, updatedAt } = lastPayload;
       const isUsedGlobal = Boolean(config && config.displayMode === 'used');
       const unitWord = isUsedGlobal ? 'used' : 'left';
-      const fmtVal = (remaining) => (isUsedGlobal ? 100 - remaining : remaining);
+      const fmtVal = (remaining) => {
+        const clamped = Math.max(0, Math.min(100, Math.round(Number(remaining) || 0)));
+        return isUsedGlobal ? 100 - clamped : clamped;
+      };
       const activeSb = getActiveSbSet(config);
 
       if (activeProviderFilter !== 'all' && !snapshots.some((s) => s.id === activeProviderFilter)) {

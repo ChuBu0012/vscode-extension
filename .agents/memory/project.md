@@ -28,5 +28,5 @@ Build customized, high-utility VS Code extensions for personal use and developer
   1. Elevated the clean **Providers** sidebar view to be the single **Main UI** (removed cluttered KPI ring strip, search box, heavy nested `.window-card` boxes, and redundant side drawer).
   2. Renamed extension cleanly to `quotadeck` (`QuotaDeck — AI Usage & Limits`, `extensions/quotadeck`, `quotadeck.*` settings & commands) ready for public Marketplace release.
   3. Kept `List | Grid` layout toggle, `Left | Used` global toggle, Provider/Status filters, Sort (`Grouped`, `Tightest First`, `Most Available`, `Soonest Reset`, `Name A–Z`), inline Status Bar `Bar` switch per pool, and collapsible `Usage History`.
-  4. Verified `tsc --noEmit`, `bun test`, `bun run compile`, `package` (`quotadeck-0.1.0.vsix`), uninstalled `most-too.ai-usage-monitor`, and installed `quotadeck-0.1.0.vsix`.
+  4. Verified `tsc --noEmit`, `bun test`, `bun run compile`, `package` (`quotadeck-0.1.1.vsix`), cross-platform hardening (Windows/Linux/macOS), and published to Open VSX Registry.
 - **Planned (Upcoming)**: Discuss & implement Custom CLI/HTTP Providers per `extensions/quotadeck/specs/future-providers-plan.md`.

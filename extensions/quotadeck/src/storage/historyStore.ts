@@ -80,7 +80,13 @@ export class HistoryStore {
       const trimmed = lines.slice(-this.maxLines).join('\n') + '\n';
       const tmpPath = `${this.filePath}.tmp`;
       await fs.writeFile(tmpPath, trimmed, 'utf8');
-      await fs.rename(tmpPath, this.filePath);
+      try {
+        await fs.rename(tmpPath, this.filePath);
+      } catch {
+        // Fallback for Windows file-locking edge cases
+        await fs.writeFile(this.filePath, trimmed, 'utf8');
+        await fs.rm(tmpPath, { force: true });
+      }
     } catch {
       // Best-effort compaction; do not break snapshot recording
     }

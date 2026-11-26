@@ -53,20 +53,31 @@ export function parseAgyUsageOutput(output: string): ModelPoolSnapshot[] {
 }
 
 async function defaultFetchUsageOutput(): Promise<string> {
-  const candidates = [
-    'agy',
-    path.join(os.homedir(), '.local', 'bin', 'agy'),
-    '/opt/homebrew/bin/agy',
-    '/usr/local/bin/agy',
-  ];
+  const isWin = process.platform === 'win32';
+  const candidates = isWin
+    ? [
+        'agy.cmd',
+        'agy.exe',
+        'agy',
+        path.join(os.homedir(), '.local', 'bin', 'agy.exe'),
+        path.join(process.env.LOCALAPPDATA || '', 'Programs', 'antigravity', 'bin', 'agy.cmd'),
+        path.join(process.env.APPDATA || '', 'npm', 'agy.cmd'),
+      ].filter(Boolean)
+    : [
+        'agy',
+        path.join(os.homedir(), '.local', 'bin', 'agy'),
+        '/opt/homebrew/bin/agy',
+        '/usr/local/bin/agy',
+      ];
 
   let lastErr: unknown;
   for (const bin of candidates) {
     try {
+      const useShell = isWin && /\.(cmd|bat)$/i.test(bin);
       const { stdout } = await execFileAsync(
         bin,
         ['--dangerously-skip-permissions', '-p', '/usage', '--print-timeout', '15s'],
-        { timeout: 18000 }
+        { timeout: 18000, windowsHide: true, shell: useShell }
       );
       if (stdout && stdout.trim()) {
         return stdout;
@@ -74,7 +85,7 @@ async function defaultFetchUsageOutput(): Promise<string> {
     } catch (err) {
       lastErr = err;
       const code = (err as { code?: string })?.code;
-      if (code === 'ENOENT') {
+      if (code === 'ENOENT' || code === 'EACCES') {
         continue;
       }
       throw err;
