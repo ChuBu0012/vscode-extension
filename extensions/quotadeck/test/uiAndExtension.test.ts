@@ -474,9 +474,9 @@ describe('StatusBarController & DashboardPanel & extension.ts', () => {
     expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('aria-checked="true"');
     expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('aria-checked="false"');
     expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('data-weekly-donut="agy-gemini"');
-    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('weekly-donut-card tone-healthy');
-    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('weekly-donut-card tone-medium');
-    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('57% left');
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('weekly-mini tone-healthy');
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('weekly-mini tone-medium');
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('57%');
     expect(dom.elements.get('historyMeta')!.textContent).toBe('1 snapshots');
 
     // List / Grid layout toggle works and persists in webview state

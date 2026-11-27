@@ -569,22 +569,17 @@ function renderAll(): void {
     const remWeekly = Math.max(0, Math.min(100, pl.weeklyPct));
     const shownWeekly = fmtVal(remWeekly);
     const tone = getQuotaTone(remWeekly);
-    const radius = 17;
+    const radius = 9;
     const circ = 2 * Math.PI * radius;
-    const offset = circ * (1 - shownWeekly / 100);
+    const arcLen = Math.max(shownWeekly > 0 || !isUsedGlobal ? 2.4 : 0, (shownWeekly / 100) * circ);
     const resetSub = pl.weeklyResetLabel && pl.weeklyResetLabel !== '--' ? pl.weeklyResetLabel : '';
-    const valLbl = shownWeekly + (isUsedGlobal ? '% used' : '% left');
-    return '<div class="weekly-donut-card ' + tone + '" data-weekly-donut="' + esc(pl.id) + '" title="Weekly limit: ' + remWeekly + '% left (' + (100 - remWeekly) + '% used)' + (resetSub ? ' · Resets ' + esc(resetSub) : '') + '">' +
-      '<svg class="weekly-donut-svg" viewBox="0 0 44 44" aria-hidden="true">' +
-        '<circle class="weekly-donut-bg" cx="22" cy="22" r="17"/>' +
-        '<circle class="weekly-donut-fg" cx="22" cy="22" r="17" transform="rotate(-90 22 22)" stroke-dasharray="' + circ.toFixed(2) + '" stroke-dashoffset="' + offset.toFixed(2) + '"/>' +
-        '<text class="weekly-donut-text" x="22" y="22" text-anchor="middle" dominant-baseline="central">' + shownWeekly + '%</text>' +
+    const valStr = shownWeekly + (isUsedGlobal ? '% used' : '%');
+    return '<div class="weekly-mini ' + tone + '" data-weekly-donut="' + esc(pl.id) + '" title="Weekly limit: ' + remWeekly + '% left (' + (100 - remWeekly) + '% used)' + (resetSub ? ' · Resets ' + esc(resetSub) : '') + '">' +
+      '<svg class="weekly-mini-svg" viewBox="0 0 24 24" aria-hidden="true">' +
+        '<circle class="weekly-mini-bg" cx="12" cy="12" r="9"/>' +
+        '<circle class="weekly-mini-fg" cx="12" cy="12" r="9" transform="rotate(-90 12 12)" stroke-dasharray="' + arcLen.toFixed(2) + ' ' + circ.toFixed(2) + '"/>' +
       '</svg>' +
-      '<div class="weekly-donut-info">' +
-        '<span class="weekly-donut-title">Weekly</span>' +
-        '<span class="weekly-donut-val">' + esc(valLbl) + '</span>' +
-        (resetSub ? '<span class="weekly-donut-sub">' + esc(resetSub) + '</span>' : '') +
-      '</div>' +
+      '<span class="weekly-mini-label">Weekly <span class="weekly-mini-val">' + esc(valStr) + '</span></span>' +
     '</div>';
   };
 
@@ -611,7 +606,11 @@ function renderAll(): void {
     if (pl.weeklyPct === 0 && hasFiveH && pl.fiveHourPct! > 0) {
       metaParts.push('Weekly cap');
     }
-    if (hasFiveH) metaParts.push('5h ' + fmtVal(pl.fiveHourPct) + '%');
+    if (hasFiveH && pl.fiveHourPct !== pl.remainingPct) {
+      metaParts.push('5h ' + fmtVal(pl.fiveHourPct) + '%');
+    } else if (hasFiveH) {
+      metaParts.push('5h');
+    }
     if (hasBal && typeof pl.budgetCapAmount === 'number') {
       metaParts.push(formatMoney(pl.balanceAmount, pl.balanceCurrency) + ' / ' + formatMoney(pl.budgetCapAmount, pl.balanceCurrency) + ' cap');
     } else if (hasBal && !hasPct) {
