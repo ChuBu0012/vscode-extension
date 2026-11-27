@@ -2,7 +2,7 @@
   "name": "quotadeck",
   "displayName": "QuotaDeck — AI Usage & Limits",
   "description": "Monitor 5-hour/weekly AI coding quotas, rate limits, and API credit balances for Antigravity, Claude Code, Codex, OpenRouter, DeepSeek, Cline, and custom endpoints.",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "publisher": "pornput-s",
   "author": {
     "name": "pornput.s"

@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.2.2
+
+- Added **Weekly Limit Donut Chart** inside quota cards with remaining-capacity color tiers (`> 50%` green, `21%–50%` amber, `<= 20%` warm coral) synchronized even in `Used` mode.
+- Improved **Responsive UI** across narrow VS Code side panels and wide windows (wrapping topbar/actions, fluid `min(100%, 290px)` grid tracks, mobile stacked donut & pool metrics).
+- Modularized Webview CSS/TypeScript assets (`src/ui/webview/*` bundled via `esbuild` with `localResourceRoots` + `asWebviewUri`), extracted `src/flows/providerOnboarding.ts`, and added GitHub Actions CI & release workflows.
+
 ## 0.2.1
 
 - Added `"AI"` category, expanded Marketplace/Open VSX search keywords, and updated `README.md` with installation guides, configuration reference, and FAQ.

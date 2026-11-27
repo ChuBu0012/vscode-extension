@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, mock } from 'bun:test';
+import * as esbuild from 'esbuild';
 import * as fs from 'fs/promises';
 import * as os from 'os';
 import * as path from 'path';
@@ -108,6 +109,7 @@ mock.module('vscode', () => ({
         webview: {
           html: '',
           cspSource: 'vscode-webview://test',
+          asWebviewUri: (uri: { toString: () => string }) => `vscode-webview-resource://${uri.toString()}`,
           postMessage: async (msg: unknown) => {
             panel.postedMessages.push(msg);
             return true;
@@ -258,9 +260,23 @@ function createMockDom(html: string) {
     postMessage: (m: unknown) => { sentMessages.push(m); },
   });
 
-  const scriptMatch = html.match(/<script nonce="[^"]+">([\s\S]*?)<\/script>/);
-  if (!scriptMatch) throw new Error('Inline script not found');
-  new Function('document', 'window', 'acquireVsCodeApi', scriptMatch[1])(mockDocument, mockWindow, acquireVsCodeApi);
+  const compiledWebviewJs = (() => {
+    const out = esbuild.buildSync({
+      entryPoints: [path.resolve(__dirname, '../src/ui/webview/client.ts')],
+      bundle: true,
+      write: false,
+      format: 'iife',
+      target: 'es2022',
+    });
+    return out.outputFiles[0].text;
+  })();
+
+  const scriptSrcMatch = html.match(/<script nonce="[^"]+" src="[^"]*webview\.js"><\/script>/);
+  const styleHrefMatch = html.match(/<link rel="stylesheet" href="[^"]*webview\.css">/);
+  if (!scriptSrcMatch || !styleHrefMatch) {
+    throw new Error('Bundled webview script or stylesheet tag not found');
+  }
+  new Function('document', 'window', 'acquireVsCodeApi', compiledWebviewJs)(mockDocument, mockWindow, acquireVsCodeApi);
 
   return { elements, mockWindow, sentMessages, getWebviewState: () => webviewState };
 }
@@ -457,6 +473,10 @@ describe('StatusBarController & DashboardPanel & extension.ts', () => {
     expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('data-sb-toggle="agy-gemini"');
     expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('aria-checked="true"');
     expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('aria-checked="false"');
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('data-weekly-donut="agy-gemini"');
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('weekly-donut-card tone-healthy');
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('weekly-donut-card tone-medium');
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('57% left');
     expect(dom.elements.get('historyMeta')!.textContent).toBe('1 snapshots');
 
     // List / Grid layout toggle works and persists in webview state

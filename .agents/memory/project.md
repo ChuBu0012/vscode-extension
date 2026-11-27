@@ -24,10 +24,10 @@ Build customized, high-utility VS Code extensions for personal use and developer
 2. `quotadeck` (`QuotaDeck — AI Usage & Limits`, renamed from `ai-usage-monitor`): Monitors exact quotas for **Antigravity** (`5h` + `Weekly` via `agy` CLI), **Claude Code** (Anthropic OAuth Usage API), and **Codex** (`~/.codex/auth.json` → `chatgpt.com/backend-api/wham/usage`). Includes global **Left / Used** toggle (`quotadeck.displayMode`), configurable inline **Status Bar Visibility** (`quotadeck.statusBarProviders`), friendly `<= 20%` warning color, Adaptive Backoff Polling (`1x -> 2x -> 4x`, max 30m), Provider-First List/Grid Dashboard with Sort/Filter + collapsible `Usage History`, and `256x256` `resources/icon.png`.
 
 ## Next Steps
-- **Completed (`quotadeck` v0.2.0 — 2026-11-26)**:
-  1. Added `SecretStore` (`src/secrets.ts`) + `quotadeck.connectProvider` / `quotadeck.disconnectProvider` commands, `+ Add Agent` QuickPick/InputBox wizard (for API keys, local agent re-checks, and custom endpoints), inline loading feedback, and Status Bar messages (`setStatusBarMessage`).
-  2. Implemented `OpenRouterProvider`, `DeepSeekProvider`, `ClineProvider`, and `CustomProviderRunner` (`quotadeck.customProviders` HTTP `https`/`localhost` + CLI `execFile` + prototype-safe `extractJsonPath`).
-  3. Updated local auto-detection (`AntigravityProvider`, `ClaudeCodeProvider`, `CodexProvider`) to mark missing binaries/credentials as `not_connected`, hide them from the Dashboard, skip them in background auto-polls, and allow manual re-checks via `+ Add Agent` or `Refresh`.
-  4. Verified `tsc --noEmit`, `bun test` (43 pass, 0 fail), `bun run package` (`quotadeck-0.2.0.vsix`), local `code --install-extension --force`, committed & pushed `v0.2.0` (`193f684`), and published `pornput-s.quotadeck v0.2.0` to Open VSX.
-  5. Updated SEO/AEO metadata and documentation (`extensions/quotadeck/package.json`, `extensions/quotadeck/README.md`, `extensions/quotadeck/CHANGELOG.md`, root `README.md`, `llms.txt`, `llms-full.txt`).
-- **Planned (Upcoming)**: Optional Wave 2 providers (e.g. GitHub Copilot / Cursor) or Visual Studio Marketplace publishing if requested.
+- **Completed (`quotadeck` v0.2.2 — Architecture, CI/CD & Visual Polish — 2026-11-27)**:
+  1. Added Weekly Limit Donut Chart (`data-weekly-donut`) + remaining-capacity color tiers (`> 50%` green, `21%–50%` amber, `<= 20%` warm coral) + full responsive layout across narrow/wide VS Code panels.
+  2. Modularized Webview into `src/ui/webview/client.ts` + `src/ui/webview/styles.css` (bundled via `esbuild` into `dist/webview.js` + `dist/webview.css`, loaded via `webview.asWebviewUri()` + `localResourceRoots`).
+  3. Extracted `src/flows/providerOnboarding.ts` out of `src/extension.ts`.
+  4. Added GitHub Actions workflows (`.github/workflows/ci.yml` and `.github/workflows/release.yml` for GitHub Release `.vsix` + conditional Open VSX / VS Marketplace publish).
+  5. Previous milestones (`v0.2.0` Wave 1 REST APIs + Custom Endpoints + `+ Add Agent`, `v0.2.1` SEO/AEO docs + `llms.txt`) published to Open VSX and pushed to `main`.
+- **Planned (Upcoming)**: Optional `HistoryStore` per-pool granularity or Wave 2 providers (Copilot/Cursor) if requested.

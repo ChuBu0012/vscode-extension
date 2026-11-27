@@ -4,7 +4,7 @@ const isProduction = process.argv.includes('--production');
 const isWatch = process.argv.includes('--watch');
 
 async function main() {
-  const ctx = await esbuild.context({
+  const extCtx = await esbuild.context({
     entryPoints: ['src/extension.ts'],
     bundle: true,
     format: 'cjs',
@@ -17,12 +17,25 @@ async function main() {
     logLevel: 'info',
   });
 
+  const webviewCtx = await esbuild.context({
+    entryPoints: ['src/ui/webview/client.ts', 'src/ui/webview/styles.css'],
+    bundle: true,
+    minify: isProduction,
+    sourcemap: !isProduction,
+    sourcesContent: false,
+    platform: 'browser',
+    target: 'es2022',
+    outdir: 'dist',
+    entryNames: 'webview',
+    logLevel: 'info',
+  });
+
   if (isWatch) {
-    await ctx.watch();
+    await Promise.all([extCtx.watch(), webviewCtx.watch()]);
     console.log('Watching for changes...');
   } else {
-    await ctx.rebuild();
-    await ctx.dispose();
+    await Promise.all([extCtx.rebuild(), webviewCtx.rebuild()]);
+    await Promise.all([extCtx.dispose(), webviewCtx.dispose()]);
   }
 }
 
