@@ -644,46 +644,16 @@ describe('StatusBarController & DashboardPanel & extension.ts', () => {
       value: ['agy-gemini', 'claude', 'agy-claude'],
     });
 
-    // Sort by lowest remaining (tightest first) orders Codex (10%) -> Claude (55%) -> Gemini (93%) -> Claude & GPT (100%)
-    const sortSelect = dom.elements.get('limitSortSelect')!;
-    sortSelect.value = 'lowest';
-    sortSelect.dispatch('change');
-    const sortedHtml = dom.elements.get('quotaBreakdown')!.innerHTML;
-    expect(sortedHtml.indexOf('Codex (Free)')).toBeLessThan(sortedHtml.indexOf('Claude (Pro)'));
-    expect(sortedHtml.indexOf('Claude (Pro)')).toBeLessThan(sortedHtml.indexOf('Gemini Models'));
-    expect(sortedHtml.indexOf('Gemini Models')).toBeLessThan(sortedHtml.indexOf('Claude and GPT models'));
-
-    // Sort by highest remaining orders Claude & GPT (100%) -> Gemini (93%) -> Claude (55%) -> Codex (10%)
-    sortSelect.value = 'highest';
-    sortSelect.dispatch('change');
-    const highestHtml = dom.elements.get('quotaBreakdown')!.innerHTML;
-    expect(highestHtml.indexOf('Claude and GPT models')).toBeLessThan(highestHtml.indexOf('Gemini Models'));
-    expect(highestHtml.indexOf('Gemini Models')).toBeLessThan(highestHtml.indexOf('Codex (Free)'));
-
-    // Status filter 'pinned' hides agy-gemini? No, keeps pinned pools (agy-gemini, claude, agy-claude) and hides codex
-    const pinnedChip = dom.elements.get('statusFilterChips')!.querySelectorAll('[data-status-filter="pinned"]')[0];
-    pinnedChip.dispatch('click');
-    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('Gemini Models');
-    expect(dom.elements.get('quotaBreakdown')!.innerHTML).not.toContain('Codex (Free)');
-
-    // Status filter 'low' shows only Codex (10% remaining), and switching to Antigravity tab produces empty state -> Reset Filters restores all
-    const lowChip = dom.elements.get('statusFilterChips')!.querySelectorAll('[data-status-filter="low"]')[0];
-    lowChip.dispatch('click');
-    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('Codex (Free)');
-    expect(dom.elements.get('quotaBreakdown')!.innerHTML).not.toContain('Gemini Models');
-
-    const agyTab = dom.elements.get('providerFilterTabs')!.querySelectorAll('[data-provider="agy"]')[0];
-    agyTab.dispatch('click');
-    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('No providers or pools match');
-    dom.elements.get('resetFiltersBtn')!.dispatch('click');
-    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('Gemini Models');
-    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('Codex (Free)');
-
-    // Clicking Claude Code provider tab filters to Claude Code only
+    // Clicking Claude Code provider tab filters to Claude Code only, then clicking All restores all
     const claudeTab = dom.elements.get('providerFilterTabs')!.querySelectorAll('[data-provider="claude"]')[0];
     claudeTab.dispatch('click');
     expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('Claude (Pro)');
     expect(dom.elements.get('quotaBreakdown')!.innerHTML).not.toContain('Codex (Free)');
+
+    const allTab = dom.elements.get('providerFilterTabs')!.querySelectorAll('[data-provider="all"]')[0];
+    allTab.dispatch('click');
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('Gemini Models');
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('Codex (Free)');
 
     // Balance-only provider & not_connected provider render cleanly with Connect / Status Bar balance
     dom.mockWindow.dispatchMessage({
@@ -818,6 +788,48 @@ describe('StatusBarController & DashboardPanel & extension.ts', () => {
     expect(wkBars.length).toBe(1);
     wkBars[0].dispatch('mouseenter');
     expect(dom.elements.get('popPct')!.textContent).toBe('80% left');
+
+    panel.dispose();
+  });
+
+  it('supports Dashboard auto-reload selector, Smart toggle, and live poll status display', () => {
+    const configUpdates: Array<{ key: string; value: unknown }> = [];
+    const panel = new DashboardPanel({
+      onRefresh: async () => {},
+      onClearHistory: async () => {},
+      onUpdateConfig: async (key, value) => {
+        configUpdates.push({ key, value });
+      },
+    });
+
+    panel.show(
+      sampleSnapshots,
+      [],
+      { ...sampleConfig, pollingIntervalSeconds: 300, smartPolling: true },
+      { mode: 'active', intervalSeconds: 60, baseSeconds: 300, smartEnabled: true, activeRemainingCooldown: 3 }
+    );
+    const dom = createMockDom(lastCreatedPanel!.webview.html);
+    dom.mockWindow.dispatchMessage({
+      command: 'state',
+      payload: {
+        snapshots: sampleSnapshots,
+        history: [],
+        config: { ...sampleConfig, pollingIntervalSeconds: 300, smartPolling: true },
+        pollStatus: { mode: 'active', intervalSeconds: 60, baseSeconds: 300, smartEnabled: true, activeRemainingCooldown: 3 },
+        updatedAt: '14:42:00',
+      },
+    });
+
+    expect(dom.elements.get('updatedAt')!.textContent).toContain('Active 1m (Smart)');
+    expect(dom.elements.get('pollIntervalSelect')!.value).toBe('300');
+    expect(dom.elements.get('smartPollBtn')!.classList.contains('active')).toBe(true);
+
+    dom.elements.get('pollIntervalSelect')!.value = '60';
+    dom.elements.get('pollIntervalSelect')!.dispatch('change');
+    dom.elements.get('smartPollBtn')!.dispatch('click');
+
+    expect(dom.sentMessages).toContainEqual({ command: 'updateConfig', key: 'pollingIntervalSeconds', value: 60 });
+    expect(dom.sentMessages).toContainEqual({ command: 'updateConfig', key: 'smartPolling', value: false });
 
     panel.dispose();
   });

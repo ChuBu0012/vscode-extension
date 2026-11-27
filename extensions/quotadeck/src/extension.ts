@@ -1,7 +1,14 @@
 import * as vscode from 'vscode';
 import { readMonitorConfig } from './config';
 import { LOCAL_PROVIDER_IDS, createProviderOnboardingFlows } from './flows/providerOnboarding';
-import { computeNextPollDelayMs, computeQuotaSignature, findEarliestResetMs } from './pollingPolicy';
+import {
+  ACTIVE_COOLDOWN_POLLS,
+  PollStatusInfo,
+  computeQuotaSignature,
+  computeSmartPollDelay,
+  findEarliestResetMs,
+  hasQuotaOrBalanceDrop,
+} from './pollingPolicy';
 import { AntigravityProvider } from './providers/antigravityProvider';
 import { ClaudeCodeProvider } from './providers/claudeProvider';
 import { ClineProvider } from './providers/clineProvider';
@@ -40,7 +47,16 @@ export function activate(context: vscode.ExtensionContext): void {
   let lastRefreshCompletedMs = 0;
   let lastQuotaSignature = '';
   let unchangedStreak = 0;
-  let currentPollDelayMs = readMonitorConfig().pollingIntervalSeconds * 1000;
+  let activeBurstRemaining = 0;
+  const initialConfig = readMonitorConfig();
+  let currentPollDelayMs = initialConfig.pollingIntervalSeconds * 1000;
+  let latestPollStatus: PollStatusInfo = {
+    mode: initialConfig.smartPolling !== false ? 'auto' : 'fixed',
+    intervalSeconds: initialConfig.pollingIntervalSeconds,
+    baseSeconds: initialConfig.pollingIntervalSeconds,
+    smartEnabled: initialConfig.smartPolling !== false,
+    activeRemainingCooldown: 0,
+  };
   let pollingTimer: ReturnType<typeof setTimeout> | undefined;
   let configDebounceTimer: ReturnType<typeof setTimeout> | undefined;
   let disposed = false;
@@ -108,33 +124,51 @@ export function activate(context: vscode.ExtensionContext): void {
         const customPromise = Promise.all(
           customConfigs.map((cfg) => fetchCustomProviderSnapshot(cfg, { secretStore }))
         );
+        const prevSnapshots = latestSnapshots;
         const [builtInSnaps, customSnaps] = await Promise.all([builtInPromise, customPromise]);
         latestSnapshots = [...builtInSnaps, ...customSnaps];
 
         const nowMs = Date.now();
         lastRefreshCompletedMs = nowMs;
 
+        const smartEnabled = config.smartPolling !== false;
         const sig = computeQuotaSignature(latestSnapshots);
-        if (isManual || lastQuotaSignature === '' || sig !== lastQuotaSignature) {
+        const dropped = smartEnabled && hasQuotaOrBalanceDrop(prevSnapshots, latestSnapshots);
+
+        if (dropped) {
+          activeBurstRemaining = ACTIVE_COOLDOWN_POLLS;
+          unchangedStreak = 0;
+          output.appendLine('[POLL] Usage drop detected — switching to active 1m polling.');
+        } else if (isManual || lastQuotaSignature === '' || sig !== lastQuotaSignature) {
           if (unchangedStreak > 0 && sig !== lastQuotaSignature) {
             output.appendLine('[POLL] Quota changed — resetting polling interval to baseline.');
           }
           unchangedStreak = 0;
+        } else if (activeBurstRemaining > 0) {
+          activeBurstRemaining -= 1;
+          unchangedStreak = 0;
+          if (activeBurstRemaining === 0) {
+            output.appendLine('[POLL] Active cooldown complete — returning to baseline interval.');
+          }
         } else {
           unchangedStreak += 1;
         }
         lastQuotaSignature = sig;
 
         const earliestResetMs = findEarliestResetMs(latestSnapshots, nowMs);
-        const nextDelayMs = computeNextPollDelayMs(
-          config.pollingIntervalSeconds,
+        const computed = computeSmartPollDelay({
+          baseIntervalSeconds: config.pollingIntervalSeconds,
+          smartEnabled,
+          activeBurstRemaining,
           unchangedStreak,
           nowMs,
-          earliestResetMs
-        );
+          earliestResetMs,
+        });
+        const nextDelayMs = computed.delayMs;
+        latestPollStatus = computed.status;
         if (nextDelayMs !== currentPollDelayMs) {
           output.appendLine(
-            `[POLL] Unchanged streak=${unchangedStreak}; next refresh in ${Math.round(nextDelayMs / 1000)}s.`
+            `[POLL] Mode=${latestPollStatus.mode}; next refresh in ${Math.round(nextDelayMs / 1000)}s.`
           );
         }
         currentPollDelayMs = nextDelayMs;
@@ -144,7 +178,7 @@ export function activate(context: vscode.ExtensionContext): void {
           await historyStore.appendSnapshot(latestSnapshots);
         }
         const history = await historyStore.readRecent(100);
-        dashboard.update(latestSnapshots, history, config);
+        dashboard.update(latestSnapshots, history, config, latestPollStatus);
       } catch (err) {
         output.appendLine(`[ERROR] Refresh failed: ${String(err)}`);
       } finally {
@@ -175,8 +209,23 @@ export function activate(context: vscode.ExtensionContext): void {
           .update(key, value, vscode.ConfigurationTarget.Global);
         const config = readMonitorConfig();
         statusBar.update(latestSnapshots, config);
+        if (key === 'pollingIntervalSeconds' || key === 'smartPolling') {
+          unchangedStreak = 0;
+          activeBurstRemaining = 0;
+          const recomputed = computeSmartPollDelay({
+            baseIntervalSeconds: config.pollingIntervalSeconds,
+            smartEnabled: config.smartPolling !== false,
+            activeBurstRemaining: 0,
+            unchangedStreak: 0,
+            nowMs: Date.now(),
+            earliestResetMs: findEarliestResetMs(latestSnapshots, Date.now()),
+          });
+          currentPollDelayMs = recomputed.delayMs;
+          latestPollStatus = recomputed.status;
+          scheduleNextPoll();
+        }
         const history = await historyStore.readRecent(100);
-        dashboard.update(latestSnapshots, history, config);
+        dashboard.update(latestSnapshots, history, config, latestPollStatus);
       },
       onConnectProvider: async (providerId) => flows.connectProviderFlow(providerId),
       onDisconnectProvider: async (providerId) => flows.disconnectProviderFlow(providerId),
@@ -275,15 +324,17 @@ export function activate(context: vscode.ExtensionContext): void {
           statusBar.update(latestSnapshots, config);
           if (
             e.affectsConfiguration('quotadeck.pollingIntervalSeconds') ||
+            e.affectsConfiguration('quotadeck.smartPolling') ||
             e.affectsConfiguration('quotadeck.budgets') ||
             e.affectsConfiguration('quotadeck.customProviders')
           ) {
             unchangedStreak = 0;
+            activeBurstRemaining = 0;
             currentPollDelayMs = config.pollingIntervalSeconds * 1000;
             void refreshAll(false, true);
           } else {
             void historyStore.readRecent(100).then((history) => {
-              dashboard.update(latestSnapshots, history, config);
+              dashboard.update(latestSnapshots, history, config, latestPollStatus);
             });
           }
         }, 150);

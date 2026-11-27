@@ -24,9 +24,9 @@ Build customized, high-utility VS Code extensions for personal use and developer
 2. `quotadeck` (`QuotaDeck — AI Usage & Limits`, renamed from `ai-usage-monitor`): Monitors exact quotas for **Antigravity** (`5h` + `Weekly` via `agy` CLI), **Claude Code** (Anthropic OAuth Usage API), and **Codex** (`~/.codex/auth.json` → `chatgpt.com/backend-api/wham/usage`). Includes global **Left / Used** toggle (`quotadeck.displayMode`), configurable inline **Status Bar Visibility** (`quotadeck.statusBarProviders`), friendly `<= 20%` warning color, Adaptive Backoff Polling (`1x -> 2x -> 4x`, max 30m), Provider-First List/Grid Dashboard with Sort/Filter + collapsible `Usage History`, and `256x256` `resources/icon.png`.
 
 ## Next Steps
-- **Completed (`quotadeck` v0.3.0 — Analytics & Pacing — 2026-11-27)**:
-  1. Added `src/pacing.ts` (`computeWindowPacing`, `computePoolPacing`) for window-based burn-rate pacing (`On pace`, `Elevated`, `Fast · ~Xh left`) surfaced on Dashboard pool cards & tooltips.
-  2. Added `quotadeck.lowThresholdPct` (default `20`) and `quotadeck.lowBalanceUsd` (default `1`) settings applied consistently across `StatusBarController`, Dashboard `Low` filters, progress bars, and Weekly Donut tones.
-  3. Upgraded `HistoryStore` to store backward-compatible per-pool `5h`, `weekly`, and USD balance snapshots, plus `All Windows / 5h Window / Weekly Window` filtering and USD hover tooltips in Usage History.
-  4. Previously committed, pushed (`cf499f6`), and published `v0.2.2` to Open VSX before starting `v0.3.0`.
-- **Planned (Upcoming)**: Commit & release `v0.3.0` via tag/Open VSX once verified by user; optional 1-click presets or Wave 2 providers later.
+- **Completed (`quotadeck` v0.3.1 — Smart Reload, Mini Donut & Clean Controls — 2026-11-27)**:
+  1. Added Dashboard `Reload: 30s / 1m / 5m / 10m` selector (`#pollIntervalSelect`, min `30s`) + `Smart` toggle (`#smartPollBtn`, `quotadeck.smartPolling`) and live `#updatedAt` status (`Active 1m (Smart)` / `Auto 5m` / `Idle 10m` / `Fixed 30s`).
+  2. Implemented `hasQuotaOrBalanceDrop` & `computeSmartPollDelay` (`1m` burst on drop, 3-poll quiet cooldown, then baseline + `1x -> 2x -> 4x` backoff).
+  3. Refined UI restraint: minimal borderless `18px` Weekly mini donut rings, chart-only semantic colors, and removed `#limitSortSelect` + `#statusFilterChips`.
+  4. Configured `.github/workflows/release.yml` for Visual Studio Marketplace Trusted Publishing (`id-token: write` + `vsce publish --oidc`) and created `.agents/skills/vscode-publishing/SKILL.md`.
+- **Planned (Upcoming)**: Monitor `quotadeck-v0.3.1` GitHub Release & Marketplace OIDC publish; optional Wave 2 providers or 1-click custom endpoint presets later.

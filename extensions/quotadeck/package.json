@@ -2,7 +2,7 @@
   "name": "quotadeck",
   "displayName": "QuotaDeck — AI Usage & Limits",
   "description": "Monitor 5-hour/weekly AI coding quotas, rate limits, and API credit balances for Antigravity, Claude Code, Codex, OpenRouter, DeepSeek, Cline, and custom endpoints.",
-  "version": "0.3.0",
+  "version": "0.3.1",
   "publisher": "pornput-s",
   "author": {
     "name": "pornput.s"
@@ -88,9 +88,14 @@
         "quotadeck.pollingIntervalSeconds": {
           "type": "number",
           "default": 300,
-          "minimum": 60,
+          "minimum": 30,
           "maximum": 3600,
-          "description": "Polling interval in seconds for refreshing usage quotas."
+          "description": "Baseline polling interval in seconds for refreshing usage quotas."
+        },
+        "quotadeck.smartPolling": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically speed up polling to 1 minute when quota or balance drops, and relax back after 3 unchanged checks."
         },
         "quotadeck.displayMode": {
           "type": "string",

@@ -68,7 +68,7 @@ QuotaDeck is currently published on Open VSX. To install in Microsoft VS Code:
 - **Global Left / Used Mode**: Toggle all cards, history bars, and the Status Bar between remaining (`% left`) and consumed (`% used`).
 - **Inline Status Bar Switches**: Toggle the `Bar` switch on any pool card to pin or unpin that provider from the Status Bar.
 - **`+ Add Agent` CTA**: Guided flow to connect OpenRouter, DeepSeek, Cline, re-check local agents, or add a custom HTTP/CLI endpoint with live button loading states and automatic Status Bar feedback.
-- **Filter, Search & Sort**: Filter by provider or status (`All`, `Low`, `Status Bar`) and sort pools by `Grouped`, `Tightest First`, `Most Available`, `Soonest Reset`, or `Name (A-Z)`.
+- **Provider Tabs & Auto-Reload Controls**: Filter cleanly by provider tab, select baseline reload interval (`30s`, `1m`, `5m`, `10m`), and toggle `Smart` auto-detect polling.
 - **Collapsible Usage History**: Compact bar chart (`24H`, `7D`, `30D`) stored locally in extension `globalStorageUri` with per-provider filtering.
 
 ### 3. Adaptive Backoff Polling & Offline Resilience
@@ -85,7 +85,8 @@ Configure via VS Code **Settings** (`Cmd+,` / `Ctrl+,` -> search `QuotaDeck`) or
 |---|---|---|
 | `quotadeck.displayMode` | `"remaining"` \| `"used"` (default `"remaining"`) | Show percentages as remaining (`left`) or consumed (`used`). |
 | `quotadeck.statusBarProviders` | `string[]` (default `["agy-gemini", "claude", "codex"]`) | Pool IDs displayed in the Status Bar (`agy-gemini`, `agy-claude`, `claude`, `codex`, `openrouter`, `deepseek`, `cline`, `custom:<id>`). |
-| `quotadeck.pollingIntervalSeconds` | `number` (default `300`, range `60`–`3600`) | Baseline polling interval in seconds before adaptive backoff (`1x -> 2x -> 4x`, max 30 min). |
+| `quotadeck.pollingIntervalSeconds` | `number` (default `300`, range `30`–`3600`) | Baseline auto-reload interval (`30s`, `1m`, `5m`, `10m` in Dashboard) before adaptive backoff. |
+| `quotadeck.smartPolling` | `boolean` (default `true`) | Automatically speed up polling to `1m` when quota/balance drops and relax back after 3 unchanged checks. |
 | `quotadeck.lowThresholdPct` | `number` (default `20`, range `1`–`90`) | Remaining quota percentage threshold for Status Bar warnings, `Low` filters, and color tiers. |
 | `quotadeck.lowBalanceUsd` | `number` (default `1`, min `0`) | Remaining USD balance threshold for uncapped balance warnings. |
 | `quotadeck.budgets` | `object` (default `{}`) | Optional USD budget caps (`{ "openrouter": 20, "deepseek": 10, "cline": 20 }`) for computing percentage bars on uncapped balances. |

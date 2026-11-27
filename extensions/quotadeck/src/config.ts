@@ -20,8 +20,12 @@ export function readMonitorConfig(): MonitorConfig {
     ? rawProviders.filter((k): k is StatusBarProviderKey => typeof k === 'string' && k.trim().length > 0)
     : DEFAULT_STATUS_BAR_PROVIDERS;
 
+  const rawSmart = cfg.get<unknown>('smartPolling', true);
+  const smartPolling = typeof rawSmart === 'boolean' ? rawSmart : true;
+
   return {
     pollingIntervalSeconds: sanitizePollingInterval(cfg.get<unknown>('pollingIntervalSeconds', 300), 300),
+    smartPolling,
     displayMode,
     statusBarProviders,
     lowThresholdPct: sanitizeLowThresholdPct(cfg.get<unknown>('lowThresholdPct', 20), 20),

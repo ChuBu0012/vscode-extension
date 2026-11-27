@@ -76,6 +76,7 @@ export interface CustomProviderConfig {
 
 export interface MonitorConfig {
   pollingIntervalSeconds: number;
+  smartPolling?: boolean;
   displayMode: QuotaDisplayMode;
   statusBarProviders: StatusBarProviderKey[];
   lowThresholdPct?: number;

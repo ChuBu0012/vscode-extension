@@ -8,8 +8,6 @@ declare function acquireVsCodeApi(): VsCodeApi;
 
 interface ViewState {
   providerFilter?: string;
-  statusFilter?: string;
-  limitSort?: string;
   limitsLayout?: 'list' | 'grid';
   historyProvider?: string;
   historyWindow?: 'all' | '5h' | 'weekly';
@@ -75,16 +73,26 @@ interface HistoryEntryPayload {
   }>;
 }
 
+interface PollStatusPayload {
+  mode: 'active' | 'auto' | 'idle' | 'fixed';
+  intervalSeconds: number;
+  baseSeconds: number;
+  smartEnabled: boolean;
+  activeRemainingCooldown: number;
+}
+
 interface DashboardStatePayload {
   snapshots: SnapshotPayload[];
   history: HistoryEntryPayload[];
   config: {
     displayMode?: 'remaining' | 'used';
     pollingIntervalSeconds?: number;
+    smartPolling?: boolean;
     statusBarProviders?: string[];
     lowThresholdPct?: number;
     lowBalanceUsd?: number;
   };
+  pollStatus?: PollStatusPayload;
   updatedAt: string;
 }
 
@@ -97,8 +105,6 @@ const vscode = acquireVsCodeApi();
 let lastPayload: DashboardStatePayload | null = null;
 let currentRange = '24H';
 let activeProviderFilter = 'all';
-let activeStatusFilter = 'all';
-let limitSort = 'default';
 let limitsLayout: 'list' | 'grid' = 'list';
 let historyProviderFilter = 'all';
 let historyWindowFilter: 'all' | '5h' | 'weekly' = 'all';
@@ -117,8 +123,6 @@ function saveViewState(patch: Partial<ViewState>): void {
 
 const savedState = vscode.getState() || {};
 if (savedState.providerFilter) activeProviderFilter = savedState.providerFilter;
-if (savedState.statusFilter) activeStatusFilter = savedState.statusFilter;
-if (savedState.limitSort) limitSort = savedState.limitSort;
 if (savedState.limitsLayout === 'grid' || savedState.limitsLayout === 'list') {
   limitsLayout = savedState.limitsLayout;
 }
@@ -155,13 +159,33 @@ if (layoutGridBtn) {
   });
 }
 
-const limitSortSelect = document.getElementById('limitSortSelect') as HTMLSelectElement | null;
-if (limitSortSelect) {
-  limitSortSelect.value = limitSort;
-  limitSortSelect.addEventListener('change', () => {
-    limitSort = limitSortSelect.value || 'default';
-    saveViewState({ limitSort });
-    if (lastPayload) renderAll();
+const formatShortInterval = (sec: number): string => {
+  if (!Number.isFinite(sec) || sec <= 0) return '5m';
+  return sec >= 60 ? Math.round(sec / 60) + 'm' : sec + 's';
+};
+
+const pollIntervalSelect = document.getElementById('pollIntervalSelect') as HTMLSelectElement | null;
+if (pollIntervalSelect) {
+  pollIntervalSelect.addEventListener('change', () => {
+    const val = Number(pollIntervalSelect.value);
+    if (!Number.isFinite(val) || val < 30) return;
+    if (lastPayload) {
+      lastPayload.config = { ...(lastPayload.config || {}), pollingIntervalSeconds: val };
+    }
+    vscode.postMessage({ command: 'updateConfig', key: 'pollingIntervalSeconds', value: val });
+  });
+}
+
+const smartPollBtn = document.getElementById('smartPollBtn');
+if (smartPollBtn) {
+  smartPollBtn.addEventListener('click', () => {
+    const currentSmart = lastPayload?.config?.smartPolling !== false;
+    const nextSmart = !currentSmart;
+    if (lastPayload) {
+      lastPayload.config = { ...(lastPayload.config || {}), smartPolling: nextSmart };
+    }
+    vscode.postMessage({ command: 'updateConfig', key: 'smartPolling', value: nextSmart });
+    renderAll();
   });
 }
 
@@ -470,11 +494,56 @@ function renderAll(): void {
   }
 
   setRefreshVisual(false);
-  const pollSec = config && typeof config.pollingIntervalSeconds === 'number' ? config.pollingIntervalSeconds : null;
-  const pollStr = pollSec ? (' · Auto ' + (pollSec >= 60 ? Math.round(pollSec / 60) + 'm' : pollSec + 's')) : '';
+  const pollSec = config && typeof config.pollingIntervalSeconds === 'number' ? config.pollingIntervalSeconds : 300;
+  const smartEnabled = config?.smartPolling !== false;
+  if (pollIntervalSelect) {
+    const secStr = String(pollSec);
+    if (!['30', '60', '300', '600'].includes(secStr)) {
+      const existingCustom = Array.from(pollIntervalSelect.options || []).some((o) => o.value === secStr);
+      if (!existingCustom && typeof document.createElement === 'function') {
+        const opt = document.createElement('option');
+        opt.value = secStr;
+        opt.textContent = 'Reload: ' + formatShortInterval(pollSec);
+        pollIntervalSelect.appendChild(opt);
+      }
+    }
+    pollIntervalSelect.value = secStr;
+  }
+  if (smartPollBtn) {
+    smartPollBtn.classList.toggle('active', smartEnabled);
+    smartPollBtn.setAttribute('aria-pressed', smartEnabled ? 'true' : 'false');
+  }
+
+  const ps = lastPayload.pollStatus;
+  let pollStr = '';
+  let pollTitle = '';
+  if (ps) {
+    const curLabel = formatShortInterval(ps.intervalSeconds);
+    const baseLabel = formatShortInterval(ps.baseSeconds);
+    if (ps.mode === 'active') {
+      pollStr = ' · Active ' + curLabel + ' (Smart)';
+      pollTitle = 'Usage drop detected — checking every ' + curLabel + ' (baseline ' + baseLabel + ', ' + ps.activeRemainingCooldown + ' quiet checks to cooldown)';
+    } else if (ps.mode === 'idle') {
+      pollStr = ' · Idle ' + curLabel;
+      pollTitle = 'Quota unchanged — backed off to ' + curLabel + ' (baseline ' + baseLabel + ')';
+    } else if (ps.mode === 'fixed') {
+      pollStr = ' · Fixed ' + curLabel;
+      pollTitle = 'Smart polling off — fixed reload every ' + curLabel;
+    } else {
+      pollStr = ' · Auto ' + curLabel;
+      pollTitle = 'Auto-reload every ' + baseLabel + ' (Smart mode speeds up to 1m on usage drop)';
+    }
+  } else {
+    const lbl = formatShortInterval(pollSec);
+    pollStr = smartEnabled ? (' · Auto ' + lbl) : (' · Fixed ' + lbl);
+    pollTitle = smartEnabled ? ('Baseline ' + lbl + ' (Smart auto-detect active)') : ('Fixed reload every ' + lbl);
+  }
   const updatedAtEl = document.getElementById('updatedAt');
   const historyMetaEl = document.getElementById('historyMeta');
-  if (updatedAtEl) updatedAtEl.textContent = 'Updated ' + updatedAt + pollStr;
+  if (updatedAtEl) {
+    updatedAtEl.textContent = 'Updated ' + updatedAt + pollStr;
+    updatedAtEl.setAttribute('title', pollTitle);
+  }
   if (historyMetaEl) historyMetaEl.textContent = history.length + ' snapshots';
 
   const clearBtn = document.getElementById('clearHistoryBtn') as HTMLButtonElement | null;
@@ -507,35 +576,6 @@ function renderAll(): void {
       btn.addEventListener('click', () => {
         activeProviderFilter = btn.getAttribute('data-provider') || 'all';
         saveViewState({ providerFilter: activeProviderFilter });
-        renderAll();
-      });
-    });
-  }
-
-  const lowCount = allLivePools.filter((p) =>
-    (typeof p.remainingPct === 'number' && p.remainingPct <= lowPct) ||
-    (typeof p.fiveHourPct === 'number' && p.fiveHourPct <= lowPct) ||
-    (typeof p.weeklyPct === 'number' && p.weeklyPct <= lowPct) ||
-    (typeof p.remainingPct !== 'number' && typeof p.balanceAmount === 'number' && p.balanceAmount <= lowBal)
-  ).length;
-  const pinnedCount = allLivePools.filter((p) => {
-    const sbKey = getStatusBarKey(p.providerId, p.id);
-    return Boolean(sbKey && activeSb.has(sbKey));
-  }).length;
-  const chipsEl = document.getElementById('statusFilterChips');
-  if (chipsEl) {
-    const chipItems = [
-      { id: 'all', label: 'All' },
-      { id: 'low', label: 'Low' + (lowCount > 0 ? ' (' + lowCount + ')' : '') },
-      { id: 'pinned', label: 'Status Bar (' + pinnedCount + ')' },
-    ];
-    chipsEl.innerHTML = chipItems.map((c) =>
-      '<button type="button" class="status-chip' + (activeStatusFilter === c.id ? ' active' : '') + '" data-status-filter="' + c.id + '">' + esc(c.label) + '</button>'
-    ).join('');
-    chipsEl.querySelectorAll('[data-status-filter]').forEach((btn) => {
-      btn.addEventListener('click', () => {
-        activeStatusFilter = btn.getAttribute('data-status-filter') || 'all';
-        saveViewState({ statusFilter: activeStatusFilter });
         renderAll();
       });
     });
@@ -661,20 +701,6 @@ function renderAll(): void {
     '</div>';
   };
 
-  const poolMatchesFilter = (s: SnapshotPayload, pl: PoolPayload): boolean => {
-    if (activeStatusFilter === 'low') {
-      return (typeof pl.remainingPct === 'number' && pl.remainingPct <= lowPct) ||
-        (typeof pl.fiveHourPct === 'number' && pl.fiveHourPct <= lowPct) ||
-        (typeof pl.weeklyPct === 'number' && pl.weeklyPct <= lowPct) ||
-        (typeof pl.remainingPct !== 'number' && typeof pl.balanceAmount === 'number' && pl.balanceAmount <= lowBal);
-    }
-    if (activeStatusFilter === 'pinned') {
-      const sbKey = getStatusBarKey(s.id, pl.id);
-      return Boolean(sbKey && activeSb.has(sbKey));
-    }
-    return true;
-  };
-
   const isKeyProvider = (id: string): boolean => id === 'openrouter' || id === 'deepseek' || id === 'cline';
   const isCustomProvider = (id: string): boolean => id.startsWith('custom:');
 
@@ -687,7 +713,6 @@ function renderAll(): void {
   const blocks: string[] = [];
 
   const appendNonLiveBlock = (p: SnapshotPayload): void => {
-    if (activeStatusFilter !== 'all') return;
     const badge = p.status === 'not_connected'
       ? 'Not connected'
       : (p.status === 'coming_soon' ? 'Coming soon' : 'Unavailable');
@@ -711,90 +736,48 @@ function renderAll(): void {
     );
   };
 
-  if (limitSort === 'default') {
-    for (const p of providerScoped) {
-      if (p.status !== 'live' || p.pools.length === 0) {
-        appendNonLiveBlock(p);
-        continue;
-      }
-      const matchedPools = p.pools.filter((pl) => poolMatchesFilter(p, pl));
-      if (matchedPools.length === 0) continue;
+  for (const p of providerScoped) {
+    if (p.status !== 'live' || p.pools.length === 0) {
+      appendNonLiveBlock(p);
+      continue;
+    }
+    const matchedPools = p.pools;
+    const numericPools = matchedPools.filter((pl) => typeof pl.remainingPct === 'number');
+    let headVal = '';
+    let headWarn = '';
+    if (numericPools.length > 0) {
+      const avg = Math.round(numericPools.reduce((sum, pl) => sum + (pl.remainingPct ?? 0), 0) / numericPools.length);
+      headVal = fmtVal(avg) + (isUsedGlobal ? '% used' : '%');
+      headWarn = ' ' + getQuotaTone(avg) + (avg <= lowPct ? ' warn' : '');
+    } else if (typeof matchedPools[0].balanceAmount === 'number') {
+      headVal = formatMoney(matchedPools[0].balanceAmount, matchedPools[0].balanceCurrency);
+      headWarn = matchedPools[0].balanceAmount <= lowBal ? ' tone-low warn' : ' tone-healthy';
+    }
 
-      const numericPools = matchedPools.filter((pl) => typeof pl.remainingPct === 'number');
-      let headVal = '';
-      let headWarn = '';
-      if (numericPools.length > 0) {
-        const avg = Math.round(numericPools.reduce((sum, pl) => sum + (pl.remainingPct ?? 0), 0) / numericPools.length);
-        headVal = fmtVal(avg) + (isUsedGlobal ? '% used' : '%');
-        headWarn = ' ' + getQuotaTone(avg) + (avg <= lowPct ? ' warn' : '');
-      } else if (typeof matchedPools[0].balanceAmount === 'number') {
-        headVal = formatMoney(matchedPools[0].balanceAmount, matchedPools[0].balanceCurrency);
-        headWarn = matchedPools[0].balanceAmount <= lowBal ? ' tone-low warn' : ' tone-healthy';
-      }
+    const isBusyDisconnect = Boolean(pendingAction && pendingAction.type === 'disconnect' && pendingAction.providerId === p.id);
+    const isBusyRemove = Boolean(pendingAction && pendingAction.type === 'remove' && pendingAction.providerId === p.id);
+    const disconnectBtn = isKeyProvider(p.id)
+      ? '<button type="button" class="btn-ghost" data-disconnect-provider="' + esc(p.id) + '" title="Remove API key from SecretStorage"' + (isBusyDisconnect ? ' disabled' : '') + '>' + (isBusyDisconnect ? 'Disconnecting...' : 'Disconnect') + '</button>'
+      : (isCustomProvider(p.id)
+        ? '<button type="button" class="btn-ghost" data-remove-custom="' + esc(p.id) + '" title="Remove custom provider"' + (isBusyRemove ? ' disabled' : '') + '>' + (isBusyRemove ? 'Removing...' : 'Remove') + '</button>'
+        : '');
+    const poolsHtml = matchedPools.map((pl) => renderPoolItem(p, pl, false)).join('');
 
-      const isBusyDisconnect = Boolean(pendingAction && pendingAction.type === 'disconnect' && pendingAction.providerId === p.id);
-      const isBusyRemove = Boolean(pendingAction && pendingAction.type === 'remove' && pendingAction.providerId === p.id);
-      const disconnectBtn = isKeyProvider(p.id)
-        ? '<button type="button" class="btn-ghost" data-disconnect-provider="' + esc(p.id) + '" title="Remove API key from SecretStorage"' + (isBusyDisconnect ? ' disabled' : '') + '>' + (isBusyDisconnect ? 'Disconnecting...' : 'Disconnect') + '</button>'
-        : (isCustomProvider(p.id)
-          ? '<button type="button" class="btn-ghost" data-remove-custom="' + esc(p.id) + '" title="Remove custom provider"' + (isBusyRemove ? ' disabled' : '') + '>' + (isBusyRemove ? 'Removing...' : 'Remove') + '</button>'
-          : '');
-      const poolsHtml = matchedPools.map((pl) => renderPoolItem(p, pl, false)).join('');
-
-      blocks.push(
-        '<div class="provider-block">' +
-          '<div class="provider-row">' +
-            '<div class="pr-left">' +
-              '<div class="pr-icon">' + esc(p.shortCode) + '</div>' +
-              '<div><div class="pr-name">' + esc(p.name) + '</div><div class="pr-sub">' + esc(p.sourceKind) + '</div></div>' +
-            '</div>' +
-            '<div class="pool-head-right">' +
-              disconnectBtn +
-              '<span class="pr-pct' + headWarn + '">' + esc(headVal) + '</span>' +
-            '</div>' +
+    blocks.push(
+      '<div class="provider-block">' +
+        '<div class="provider-row">' +
+          '<div class="pr-left">' +
+            '<div class="pr-icon">' + esc(p.shortCode) + '</div>' +
+            '<div><div class="pr-name">' + esc(p.name) + '</div><div class="pr-sub">' + esc(p.sourceKind) + '</div></div>' +
           '</div>' +
-          '<div class="pool-list">' + poolsHtml + '</div>' +
-        '</div>'
-      );
-    }
-  } else {
-    const flatItems: Array<{ p: SnapshotPayload; pl: PoolPayload }> = [];
-    for (const p of providerScoped) {
-      if (p.status !== 'live' || p.pools.length === 0) {
-        appendNonLiveBlock(p);
-        continue;
-      }
-      for (const pl of p.pools) {
-        if (poolMatchesFilter(p, pl)) {
-          flatItems.push({ p, pl });
-        }
-      }
-    }
-
-    const pctScore = (pl: PoolPayload): number => typeof pl.remainingPct === 'number' ? pl.remainingPct : Number.MAX_SAFE_INTEGER;
-    flatItems.sort((a, b) => {
-      if (limitSort === 'lowest') {
-        const diff = pctScore(a.pl) - pctScore(b.pl);
-        if (diff !== 0) return diff;
-        return (a.pl.nextResetMs ?? Number.MAX_SAFE_INTEGER) - (b.pl.nextResetMs ?? Number.MAX_SAFE_INTEGER);
-      }
-      if (limitSort === 'highest') {
-        const aVal = typeof a.pl.remainingPct === 'number' ? a.pl.remainingPct : -1;
-        const bVal = typeof b.pl.remainingPct === 'number' ? b.pl.remainingPct : -1;
-        return bVal - aVal;
-      }
-      if (limitSort === 'reset') {
-        return (a.pl.nextResetMs ?? Number.MAX_SAFE_INTEGER) - (b.pl.nextResetMs ?? Number.MAX_SAFE_INTEGER);
-      }
-      if (limitSort === 'name') {
-        return a.pl.name.localeCompare(b.pl.name);
-      }
-      return 0;
-    });
-
-    for (const item of flatItems) {
-      blocks.push(renderPoolItem(item.p, item.pl, true));
-    }
+          '<div class="pool-head-right">' +
+            disconnectBtn +
+            '<span class="pr-pct' + headWarn + '">' + esc(headVal) + '</span>' +
+          '</div>' +
+        '</div>' +
+        '<div class="pool-list">' + poolsHtml + '</div>' +
+      '</div>'
+    );
   }
 
   if (blocks.length === 0) {
@@ -816,10 +799,7 @@ function renderAll(): void {
       '</div>';
       document.getElementById('resetFiltersBtn')?.addEventListener('click', () => {
         activeProviderFilter = 'all';
-        activeStatusFilter = 'all';
-        limitSort = 'default';
-        if (limitSortSelect) limitSortSelect.value = 'default';
-        saveViewState({ providerFilter: 'all', statusFilter: 'all', limitSort: 'default' });
+        saveViewState({ providerFilter: 'all' });
         renderAll();
       });
     }

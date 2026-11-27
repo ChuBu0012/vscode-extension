@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.1
+
+- Added **Auto-Reload Selector (`30s`, `1m`, `5m`, `10m`)** and **Smart Poll Toggle** directly in the Dashboard header (`quotadeck.pollingIntervalSeconds` minimum lowered to `30s`, added `quotadeck.smartPolling`).
+- Added **Smart Auto-Detect Polling**: speeds up to `1m` automatically when quota or balance drops, cools down back to baseline after 3 quiet checks, and displays live cadence status (`Active 1m (Smart)` / `Auto 5m` / `Idle 10m` / `Fixed 30s`) next to the update timestamp.
+- Refined UI restraint: minimal borderless Weekly mini donut ring (`18px`) and strictly chart-only semantic colors (soft sage, warm ochre, muted terracotta).
+
 ## 0.3.0
 
 - Added **Window-Based Quota Pacing** (`src/pacing.ts`) comparing consumed quota percentage against elapsed 5-hour / weekly window time (`On pace`, `Elevated`, `Fast · ~Xh left`).

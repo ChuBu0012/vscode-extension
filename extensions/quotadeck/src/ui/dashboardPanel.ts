@@ -1,13 +1,16 @@
 import * as crypto from 'crypto';
 import * as vscode from 'vscode';
 import { computePoolPacing } from '../pacing';
+import { PollStatusInfo } from '../pollingPolicy';
 import { formatResetCountdown, parseAgyResetTimestamp } from '../timeFormat';
 import { HistoryPoint, MonitorConfig, ProviderSnapshot, averageRemainingPct } from '../types';
+
+export type DashboardConfigKey = 'displayMode' | 'statusBarProviders' | 'pollingIntervalSeconds' | 'smartPolling';
 
 export interface DashboardCallbacks {
   onRefresh: () => Promise<void>;
   onClearHistory: () => Promise<void>;
-  onUpdateConfig?: (key: 'displayMode' | 'statusBarProviders', value: unknown) => Promise<void>;
+  onUpdateConfig?: (key: DashboardConfigKey, value: unknown) => Promise<void>;
   onConnectProvider?: (providerId?: string) => Promise<string | void>;
   onDisconnectProvider?: (providerId: string) => Promise<void>;
   onRemoveCustomProvider?: (providerId: string) => Promise<void>;
@@ -19,16 +22,20 @@ export class DashboardPanel implements vscode.Disposable {
   private latestSnapshots: ProviderSnapshot[] = [];
   private latestHistory: HistoryPoint[] = [];
   private latestConfig: MonitorConfig | undefined;
+  private latestPollStatus: PollStatusInfo | undefined;
 
   constructor(
     private readonly callbacks: DashboardCallbacks,
     private readonly extensionUri?: vscode.Uri
   ) {}
 
-  show(snapshots: ProviderSnapshot[], history: HistoryPoint[], config: MonitorConfig): void {
+  show(snapshots: ProviderSnapshot[], history: HistoryPoint[], config: MonitorConfig, pollStatus?: PollStatusInfo): void {
     this.latestSnapshots = snapshots;
     this.latestHistory = history;
     this.latestConfig = config;
+    if (pollStatus) {
+      this.latestPollStatus = pollStatus;
+    }
 
     if (this.panel) {
       this.panel.reveal(vscode.ViewColumn.One);
@@ -69,7 +76,13 @@ export class DashboardPanel implements vscode.Disposable {
           await this.callbacks.onClearHistory();
         } else if (message.command === 'updateConfig') {
           const key = message.key;
-          if ((key === 'displayMode' || key === 'statusBarProviders') && this.callbacks.onUpdateConfig) {
+          if (
+            (key === 'displayMode' ||
+              key === 'statusBarProviders' ||
+              key === 'pollingIntervalSeconds' ||
+              key === 'smartPolling') &&
+            this.callbacks.onUpdateConfig
+          ) {
             await this.callbacks.onUpdateConfig(key, message.value);
           }
         } else if (message.command === 'connectProvider') {
@@ -114,10 +127,13 @@ export class DashboardPanel implements vscode.Disposable {
     this.postState();
   }
 
-  update(snapshots: ProviderSnapshot[], history: HistoryPoint[], config: MonitorConfig): void {
+  update(snapshots: ProviderSnapshot[], history: HistoryPoint[], config: MonitorConfig, pollStatus?: PollStatusInfo): void {
     this.latestSnapshots = snapshots;
     this.latestHistory = history;
     this.latestConfig = config;
+    if (pollStatus) {
+      this.latestPollStatus = pollStatus;
+    }
     if (this.panel) {
       this.postState();
     }
@@ -181,6 +197,7 @@ export class DashboardPanel implements vscode.Disposable {
         snapshots: enrichedSnapshots,
         history: this.latestHistory,
         config: this.latestConfig,
+        pollStatus: this.latestPollStatus,
         summary: {
           liveCount: liveProviders.length,
           totalCount: this.latestSnapshots.length,
@@ -288,13 +305,13 @@ export class DashboardPanel implements vscode.Disposable {
         <span class="meta-time" id="actionNotice" aria-live="polite"></span>
       </div>
       <div class="board-controls">
-        <select class="select-control" id="limitSortSelect" aria-label="Sort quota pools" title="Sort quota pools">
-          <option value="default">Sort: Grouped</option>
-          <option value="lowest">Sort: Tightest First</option>
-          <option value="highest">Sort: Most Available</option>
-          <option value="reset">Sort: Soonest Reset</option>
-          <option value="name">Sort: Name (A–Z)</option>
+        <select class="select-control" id="pollIntervalSelect" aria-label="Auto reload interval" title="Baseline auto-reload interval">
+          <option value="30">Reload: 30s</option>
+          <option value="60">Reload: 1m</option>
+          <option value="300">Reload: 5m</option>
+          <option value="600">Reload: 10m</option>
         </select>
+        <button type="button" class="filter-tab active" id="smartPollBtn" aria-pressed="true" title="Smart polling: speeds up to 1m when quota drops, relaxes after 3 unchanged checks">Smart</button>
         <div class="mode-switch" role="group" aria-label="Dashboard layout">
           <button type="button" class="mode-btn active" id="layoutListBtn" data-layout="list" title="List view">
             <svg class="btn-icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
@@ -319,7 +336,6 @@ export class DashboardPanel implements vscode.Disposable {
 
     <div class="filter-strip">
       <div class="provider-filter-tabs" id="providerFilterTabs"></div>
-      <div class="status-chips" id="statusFilterChips" role="group" aria-label="Filter by quota status"></div>
     </div>
 
     <div class="provider-stack" id="quotaBreakdown"></div>

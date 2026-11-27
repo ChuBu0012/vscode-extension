@@ -141,7 +141,7 @@ body {
   gap: 0.5rem;
   flex-wrap: wrap;
 }
-.provider-filter-tabs, .status-chips { display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center; }
+.provider-filter-tabs { display: flex; gap: 0.35rem; flex-wrap: wrap; align-items: center; }
 .filter-tab {
   padding: 0.22rem 0.58rem;
   border-radius: 6px;
@@ -167,18 +167,6 @@ body {
 }
 .status-dot.live { background: var(--positive); opacity: 1; }
 .status-dot.warn { background: var(--warning); opacity: 1; }
-.status-chip {
-  padding: 0.2rem 0.52rem;
-  border-radius: 999px;
-  font-size: 0.7rem;
-  font-family: var(--font-sans);
-  border: 1px solid var(--border);
-  background: var(--bg-canvas);
-  color: var(--text-secondary);
-  cursor: pointer;
-}
-.status-chip:hover { border-color: var(--accent); color: var(--text-primary); }
-.status-chip.active { border-color: var(--accent); color: var(--accent); background: var(--bg-subtle); font-weight: 600; }
 
 /* Provider-first clean list (default) */
 .provider-stack { border-top: 1px solid var(--border); }
