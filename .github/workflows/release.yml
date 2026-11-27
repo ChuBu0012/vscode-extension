@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     permissions:
       contents: write
+      id-token: write
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -44,8 +45,12 @@ jobs:
           OVSX_PAT: ${{ secrets.OVSX_PAT }}
         run: bunx ovsx publish extensions/quotadeck/*.vsix -p "$OVSX_PAT"
 
-      - name: Publish to Visual Studio Marketplace
+      - name: Publish to Visual Studio Marketplace (Trusted Publishing OIDC)
+        if: ${{ secrets.VSCE_PAT == '' }}
+        run: bunx @vscode/vsce@latest publish --oidc --packagePath extensions/quotadeck/*.vsix
+
+      - name: Publish to Visual Studio Marketplace (PAT fallback)
         if: ${{ secrets.VSCE_PAT != '' }}
         env:
           VSCE_PAT: ${{ secrets.VSCE_PAT }}
-        run: bunx @vscode/vsce publish --packagePath extensions/quotadeck/*.vsix -p "$VSCE_PAT"
+        run: bunx @vscode/vsce@latest publish --packagePath extensions/quotadeck/*.vsix -p "$VSCE_PAT"

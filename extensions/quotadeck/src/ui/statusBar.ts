@@ -65,6 +65,8 @@ export class StatusBarController implements vscode.Disposable {
     const isUsed = mode === 'used';
     const unit = isUsed ? 'used' : 'left';
     const enabledKeys = new Set<StatusBarProviderKey>(config?.statusBarProviders ?? DEFAULT_SB_KEYS);
+    const lowPct = typeof config?.lowThresholdPct === 'number' ? config.lowThresholdPct : 20;
+    const lowBal = typeof config?.lowBalanceUsd === 'number' ? config.lowBalanceUsd : 1;
 
     const fmtVal = (remaining: number): number => (isUsed ? 100 - remaining : remaining);
 
@@ -83,12 +85,12 @@ export class StatusBarController implements vscode.Disposable {
         if (typeof pool.remainingPct === 'number') {
           hasAnyPctPart = true;
           statusParts.push(`${tag} ${fmtVal(pool.remainingPct)}%`);
-          if (pool.remainingPct <= 20) {
+          if (pool.remainingPct <= lowPct) {
             hasWarning = true;
           }
         } else if (typeof pool.balanceAmount === 'number') {
           statusParts.push(`${tag} ${formatCurrency(pool.balanceAmount, pool.balanceCurrency)}`);
-          if (pool.balanceAmount <= 1) {
+          if (pool.balanceAmount <= lowBal) {
             hasWarning = true;
           }
         }

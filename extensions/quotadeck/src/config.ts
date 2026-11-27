@@ -1,5 +1,11 @@
 import * as vscode from 'vscode';
-import { sanitizeBudgets, sanitizeCustomProviders, sanitizePollingInterval } from './configValidation';
+import {
+  sanitizeBudgets,
+  sanitizeCustomProviders,
+  sanitizeLowBalanceUsd,
+  sanitizeLowThresholdPct,
+  sanitizePollingInterval,
+} from './configValidation';
 import { MonitorConfig, QuotaDisplayMode, StatusBarProviderKey } from './types';
 
 const DEFAULT_STATUS_BAR_PROVIDERS: StatusBarProviderKey[] = ['agy-gemini', 'claude', 'codex'];
@@ -18,6 +24,8 @@ export function readMonitorConfig(): MonitorConfig {
     pollingIntervalSeconds: sanitizePollingInterval(cfg.get<unknown>('pollingIntervalSeconds', 300), 300),
     displayMode,
     statusBarProviders,
+    lowThresholdPct: sanitizeLowThresholdPct(cfg.get<unknown>('lowThresholdPct', 20), 20),
+    lowBalanceUsd: sanitizeLowBalanceUsd(cfg.get<unknown>('lowBalanceUsd', 1), 1),
     budgets: sanitizeBudgets(cfg.get<unknown>('budgets', {})),
     customProviders: sanitizeCustomProviders(cfg.get<unknown>('customProviders', [])),
   };

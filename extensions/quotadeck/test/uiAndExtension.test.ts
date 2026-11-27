@@ -724,6 +724,104 @@ describe('StatusBarController & DashboardPanel & extension.ts', () => {
     panel.dispose();
   });
 
+  it('supports custom low thresholds, pacing badges, and 5h/weekly/USD history filtering', () => {
+    const sb = new StatusBarController();
+    sb.update(
+      [
+        {
+          id: 'claude',
+          shortCode: 'CL',
+          name: 'Claude Code',
+          status: 'live',
+          sourceKind: 'Exact',
+          pools: [{ id: 'claude-main', name: 'Claude (Pro)', remainingPct: 30, fiveHourPct: 30, weeklyPct: 80 }],
+        },
+      ],
+      { ...sampleConfig, lowThresholdPct: 35, statusBarProviders: ['claude'] }
+    );
+    expect(lastCreatedStatusBarItem?.text).toBe('$(warning) CL 30%');
+    expect((lastCreatedStatusBarItem?.backgroundColor as MockThemeColor)?.id).toBe('statusBarItem.warningBackground');
+    sb.dispose();
+
+    const panel = new DashboardPanel({
+      onRefresh: async () => {},
+      onClearHistory: async () => {},
+    });
+    const nowIso = new Date().toISOString();
+    panel.show([], [], sampleConfig);
+    const dom = createMockDom(lastCreatedPanel!.webview.html);
+    dom.mockWindow.dispatchMessage({
+      command: 'state',
+      payload: {
+        snapshots: [
+          {
+            id: 'claude',
+            shortCode: 'CL',
+            name: 'Claude Code',
+            status: 'live',
+            sourceKind: 'Exact',
+            pools: [
+              {
+                id: 'claude-main',
+                name: 'Claude (Pro)',
+                remainingPct: 30,
+                fiveHourPct: 30,
+                weeklyPct: 80,
+                pacing: { window: 'weekly', level: 'on_pace', ratio: 0.8, label: 'Weekly: On pace', detail: '20% used in 25% of Weekly window' },
+              },
+            ],
+          },
+        ],
+        history: [
+          {
+            timestamp: nowIso,
+            providers: [
+              {
+                id: 'claude',
+                remainingPct: 30,
+                usedTokens: 0,
+                pools: [{ id: 'claude-main', remainingPct: 30, fiveHourPct: 30, weeklyPct: 80 }],
+              },
+              {
+                id: 'deepseek',
+                remainingPct: 0,
+                usedTokens: 0,
+                balanceAmount: 14.25,
+                balanceCurrency: 'USD',
+                pools: [{ id: 'deepseek-main', balanceAmount: 14.25, balanceCurrency: 'USD' }],
+              },
+            ],
+          },
+        ],
+        config: { ...sampleConfig, lowThresholdPct: 35 },
+        summary: { liveCount: 1, totalCount: 1 },
+        updatedAt: '11:15:00',
+      },
+    });
+
+    // 30% <= custom lowThresholdPct 35 -> tone-low + pacing badge rendered
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('q-fill tone-low warn');
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('pacing-badge on_pace');
+    expect(dom.elements.get('quotaBreakdown')!.innerHTML).toContain('Weekly: On pace');
+
+    // Overall bar hover shows DeepSeek USD balance in popDetail
+    const allBars = dom.elements.get('barsRow')!.querySelectorAll('.bar-col');
+    expect(allBars.length).toBe(1);
+    allBars[0].dispatch('mouseenter');
+    expect(dom.elements.get('popDetail')!.textContent).toContain('DEEPSEEK: $14.25');
+
+    // Switch historyWindowSelect to 'weekly' -> plots weeklyPct 80%
+    const winSelect = dom.elements.get('historyWindowSelect')!;
+    winSelect.value = 'weekly';
+    winSelect.dispatch('change');
+    const wkBars = dom.elements.get('barsRow')!.querySelectorAll('.bar-col');
+    expect(wkBars.length).toBe(1);
+    wkBars[0].dispatch('mouseenter');
+    expect(dom.elements.get('popPct')!.textContent).toBe('80% left');
+
+    panel.dispose();
+  });
+
   it('extension activate() wires commands and disposes cleanly', async () => {
     const tmpStorage = await fs.mkdtemp(path.join(os.tmpdir(), 'ai-usage-ext-'));
     tempDirs.push(tmpStorage);

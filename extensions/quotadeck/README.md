@@ -86,6 +86,8 @@ Configure via VS Code **Settings** (`Cmd+,` / `Ctrl+,` -> search `QuotaDeck`) or
 | `quotadeck.displayMode` | `"remaining"` \| `"used"` (default `"remaining"`) | Show percentages as remaining (`left`) or consumed (`used`). |
 | `quotadeck.statusBarProviders` | `string[]` (default `["agy-gemini", "claude", "codex"]`) | Pool IDs displayed in the Status Bar (`agy-gemini`, `agy-claude`, `claude`, `codex`, `openrouter`, `deepseek`, `cline`, `custom:<id>`). |
 | `quotadeck.pollingIntervalSeconds` | `number` (default `300`, range `60`–`3600`) | Baseline polling interval in seconds before adaptive backoff (`1x -> 2x -> 4x`, max 30 min). |
+| `quotadeck.lowThresholdPct` | `number` (default `20`, range `1`–`90`) | Remaining quota percentage threshold for Status Bar warnings, `Low` filters, and color tiers. |
+| `quotadeck.lowBalanceUsd` | `number` (default `1`, min `0`) | Remaining USD balance threshold for uncapped balance warnings. |
 | `quotadeck.budgets` | `object` (default `{}`) | Optional USD budget caps (`{ "openrouter": 20, "deepseek": 10, "cline": 20 }`) for computing percentage bars on uncapped balances. |
 | `quotadeck.customProviders` | `CustomProviderConfig[]` (default `[]`) | Array of custom HTTP JSON (`https://`/`localhost`) or local CLI usage providers. |
 

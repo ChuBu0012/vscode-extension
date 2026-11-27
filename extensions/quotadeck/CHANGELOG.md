@@ -1,5 +1,11 @@
 # Changelog
 
+## 0.3.0
+
+- Added **Window-Based Quota Pacing** (`src/pacing.ts`) comparing consumed quota percentage against elapsed 5-hour / weekly window time (`On pace`, `Elevated`, `Fast · ~Xh left`).
+- Added **Configurable Warning Thresholds**: `quotadeck.lowThresholdPct` (default `20%`) and `quotadeck.lowBalanceUsd` (default `$1.00`), unified across Status Bar warnings, Dashboard `Low` filters, Donut Charts, and progress bars.
+- Upgraded **Per-Pool & USD History Granularity** (`HistoryStore` + Dashboard Usage History): stores `5h`, `Weekly`, and USD balance snapshots backward-compatibly and adds an `All Windows / 5h Window / Weekly Window` history selector plus USD balance breakdown in hover popovers.
+
 ## 0.2.2
 
 - Added **Weekly Limit Donut Chart** inside quota cards with remaining-capacity color tiers (`> 50%` green, `21%–50%` amber, `<= 20%` warm coral) synchronized even in `Used` mode.

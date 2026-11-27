@@ -25,12 +25,25 @@ export interface ProviderSnapshot {
   requiresConnect?: boolean;
 }
 
+export interface HistoryPoolEntry {
+  id: string;
+  name?: string;
+  remainingPct?: number;
+  fiveHourPct?: number;
+  weeklyPct?: number;
+  balanceAmount?: number;
+  balanceCurrency?: string;
+}
+
 export interface HistoryPoint {
   timestamp: string;
   providers: Array<{
     id: string;
     remainingPct: number;
     usedTokens: number;
+    balanceAmount?: number;
+    balanceCurrency?: string;
+    pools?: HistoryPoolEntry[];
   }>;
 }
 
@@ -65,6 +78,8 @@ export interface MonitorConfig {
   pollingIntervalSeconds: number;
   displayMode: QuotaDisplayMode;
   statusBarProviders: StatusBarProviderKey[];
+  lowThresholdPct?: number;
+  lowBalanceUsd?: number;
   budgets?: BudgetConfig;
   customProviders?: CustomProviderConfig[];
 }

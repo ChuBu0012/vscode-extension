@@ -23,7 +23,8 @@ function isValidHistoryPoint(val: unknown): val is HistoryPoint {
       typeof p.remainingPct === 'number' &&
       Number.isFinite(p.remainingPct) &&
       typeof p.usedTokens === 'number' &&
-      Number.isFinite(p.usedTokens)
+      Number.isFinite(p.usedTokens) &&
+      (p.pools === undefined || Array.isArray(p.pools))
   );
 }
 
@@ -54,7 +55,9 @@ export class HistoryStore {
 
   private async performAppend(snapshots: ProviderSnapshot[]): Promise<void> {
     const live = snapshots.filter(
-      (s) => s.status === 'live' && s.pools.some((p) => typeof p.remainingPct === 'number')
+      (s) =>
+        s.status === 'live' &&
+        s.pools.some((p) => typeof p.remainingPct === 'number' || typeof p.balanceAmount === 'number')
     );
     if (live.length === 0) {
       return;
@@ -62,11 +65,26 @@ export class HistoryStore {
     await fs.mkdir(this.storageDir, { recursive: true });
     const entry: HistoryPoint = {
       timestamp: new Date().toISOString(),
-      providers: live.map((s) => ({
-        id: s.id,
-        remainingPct: averageRemainingPct(s.pools),
-        usedTokens: 0,
-      })),
+      providers: live.map((s) => {
+        const primaryBalPool = s.pools.find((p) => typeof p.balanceAmount === 'number');
+        const hasNumericPct = s.pools.some((p) => typeof p.remainingPct === 'number');
+        return {
+          id: s.id,
+          remainingPct: hasNumericPct ? averageRemainingPct(s.pools) : 0,
+          usedTokens: 0,
+          balanceAmount: primaryBalPool?.balanceAmount,
+          balanceCurrency: primaryBalPool?.balanceCurrency,
+          pools: s.pools.map((p) => ({
+            id: p.id,
+            name: p.name,
+            remainingPct: p.remainingPct,
+            fiveHourPct: p.fiveHourPct,
+            weeklyPct: p.weeklyPct,
+            balanceAmount: p.balanceAmount,
+            balanceCurrency: p.balanceCurrency,
+          })),
+        };
+      }),
     };
     await fs.appendFile(this.filePath, JSON.stringify(entry) + '\n', 'utf8');
     await this.compactIfNeeded();

@@ -1,5 +1,6 @@
 import * as crypto from 'crypto';
 import * as vscode from 'vscode';
+import { computePoolPacing } from '../pacing';
 import { formatResetCountdown, parseAgyResetTimestamp } from '../timeFormat';
 import { HistoryPoint, MonitorConfig, ProviderSnapshot, averageRemainingPct } from '../types';
 
@@ -151,6 +152,7 @@ export class DashboardPanel implements vscode.Disposable {
           fiveHourResetMs,
           nextResetMs: earliest ? earliest.ms : null,
           nextResetLabel: earliest ? formatResetCountdown(earliest.raw) : '--',
+          pacing: computePoolPacing(p, fiveHourResetMs, weeklyResetMs),
         };
       }),
     }));
@@ -336,9 +338,16 @@ export class DashboardPanel implements vscode.Disposable {
       <div class="collapsible-body collapsed" id="historyBody">
         <div class="chart-area">
           <div class="section-header">
-            <select class="select-control" id="historyProviderSelect" aria-label="Filter history by provider">
-              <option value="all">All Providers</option>
-            </select>
+            <div class="history-select-group">
+              <select class="select-control" id="historyProviderSelect" aria-label="Filter history by provider">
+                <option value="all">All Providers</option>
+              </select>
+              <select class="select-control" id="historyWindowSelect" aria-label="Filter history by quota window">
+                <option value="all">All Windows</option>
+                <option value="5h">5h Window</option>
+                <option value="weekly">Weekly Window</option>
+              </select>
+            </div>
             <div class="range-tabs">
               <button type="button" class="range-tab active" data-range="24H">24H</button>
               <button type="button" class="range-tab" data-range="7D">7D</button>

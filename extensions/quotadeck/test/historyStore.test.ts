@@ -65,4 +65,34 @@ describe('HistoryStore', () => {
     const diskLines = raw.split('\n').filter(Boolean);
     expect(diskLines).toHaveLength(5);
   });
+
+  it('records per-pool 5h/weekly and USD balance entries while keeping legacy compatibility', async () => {
+    const store = new HistoryStore(tmpDir);
+    await store.appendSnapshot([
+      {
+        id: 'claude',
+        shortCode: 'CL',
+        name: 'Claude Code',
+        status: 'live',
+        sourceKind: 'Exact',
+        pools: [{ id: 'claude-main', name: 'Claude (Pro)', remainingPct: 60, fiveHourPct: 60, weeklyPct: 40 }],
+      },
+      {
+        id: 'deepseek',
+        shortCode: 'DS',
+        name: 'DeepSeek',
+        status: 'live',
+        sourceKind: 'Exact',
+        pools: [{ id: 'deepseek-main', name: 'DeepSeek Balance', balanceAmount: 12.5, balanceCurrency: 'USD' }],
+      },
+    ]);
+
+    const pts = await store.readRecent(10);
+    expect(pts).toHaveLength(1);
+    expect(pts[0].providers).toHaveLength(2);
+    expect(pts[0].providers[0].pools?.[0].fiveHourPct).toBe(60);
+    expect(pts[0].providers[0].pools?.[0].weeklyPct).toBe(40);
+    expect(pts[0].providers[1].balanceAmount).toBe(12.5);
+    expect(pts[0].providers[1].balanceCurrency).toBe('USD');
+  });
 });

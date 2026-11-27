@@ -4,7 +4,7 @@
 
 ## Canonical Metadata
 - **Extension ID**: `pornput-s.quotadeck`
-- **Version**: `0.2.0`
+- **Version**: `0.3.0`
 - **Publisher**: `pornput-s` (`author`: `pornput.s`)
 - **License**: `MIT`
 - **VS Code Engine**: `^1.90.0`
@@ -52,6 +52,8 @@
 - `quotadeck.displayMode`: `"remaining"` (default) | `"used"`
 - `quotadeck.statusBarProviders`: `string[]` (default `["agy-gemini", "claude", "codex"]`; supports `"agy-claude"`, `"openrouter"`, `"deepseek"`, `"cline"`, `"custom:<id>"`)
 - `quotadeck.pollingIntervalSeconds`: `number` (default `300`, UI range `60`–`3600`, sanitizer clamps `30`–`3600`)
+- `quotadeck.lowThresholdPct`: `number` (default `20`, range `1`–`90`)
+- `quotadeck.lowBalanceUsd`: `number` (default `1`, min `0`)
 - `quotadeck.budgets`: `{ openrouter?: number, deepseek?: number, cline?: number }`
 - `quotadeck.customProviders`: `CustomProviderConfig[]`
 

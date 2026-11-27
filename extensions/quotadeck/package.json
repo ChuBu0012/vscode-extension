@@ -2,7 +2,7 @@
   "name": "quotadeck",
   "displayName": "QuotaDeck — AI Usage & Limits",
   "description": "Monitor 5-hour/weekly AI coding quotas, rate limits, and API credit balances for Antigravity, Claude Code, Codex, OpenRouter, DeepSeek, Cline, and custom endpoints.",
-  "version": "0.2.2",
+  "version": "0.3.0",
   "publisher": "pornput-s",
   "author": {
     "name": "pornput.s"
@@ -105,6 +105,19 @@
           },
           "default": ["agy-gemini", "claude", "codex"],
           "description": "Which provider quotas to show in the Status Bar (e.g. 'agy-gemini', 'agy-claude', 'claude', 'codex', 'openrouter', 'deepseek', 'cline', or 'custom:<id>')."
+        },
+        "quotadeck.lowThresholdPct": {
+          "type": "number",
+          "default": 20,
+          "minimum": 1,
+          "maximum": 90,
+          "description": "Remaining quota percentage threshold at or below which warning highlights and Low status filters activate."
+        },
+        "quotadeck.lowBalanceUsd": {
+          "type": "number",
+          "default": 1,
+          "minimum": 0,
+          "description": "Remaining USD balance threshold at or below which uncapped balance providers trigger low-balance warnings."
         },
         "quotadeck.budgets": {
           "type": "object",

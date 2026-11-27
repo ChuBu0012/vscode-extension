@@ -12,7 +12,16 @@ interface ViewState {
   limitSort?: string;
   limitsLayout?: 'list' | 'grid';
   historyProvider?: string;
+  historyWindow?: 'all' | '5h' | 'weekly';
   historyOpen?: boolean;
+}
+
+interface PacingPayload {
+  window: '5h' | 'weekly';
+  level: 'on_pace' | 'moderate' | 'fast';
+  ratio: number;
+  label: string;
+  detail: string;
 }
 
 interface PoolPayload {
@@ -30,6 +39,7 @@ interface PoolPayload {
   balanceAmount?: number;
   balanceCurrency?: string;
   budgetCapAmount?: number;
+  pacing?: PacingPayload | null;
 }
 
 interface SnapshotPayload {
@@ -43,9 +53,26 @@ interface SnapshotPayload {
   pools: PoolPayload[];
 }
 
+interface HistoryPoolPayload {
+  id: string;
+  name?: string;
+  remainingPct?: number;
+  fiveHourPct?: number;
+  weeklyPct?: number;
+  balanceAmount?: number;
+  balanceCurrency?: string;
+}
+
 interface HistoryEntryPayload {
   timestamp: string;
-  providers: Array<{ id: string; remainingPct: number; usedTokens: number }>;
+  providers: Array<{
+    id: string;
+    remainingPct: number;
+    usedTokens: number;
+    balanceAmount?: number;
+    balanceCurrency?: string;
+    pools?: HistoryPoolPayload[];
+  }>;
 }
 
 interface DashboardStatePayload {
@@ -55,6 +82,8 @@ interface DashboardStatePayload {
     displayMode?: 'remaining' | 'used';
     pollingIntervalSeconds?: number;
     statusBarProviders?: string[];
+    lowThresholdPct?: number;
+    lowBalanceUsd?: number;
   };
   updatedAt: string;
 }
@@ -72,6 +101,7 @@ let activeStatusFilter = 'all';
 let limitSort = 'default';
 let limitsLayout: 'list' | 'grid' = 'list';
 let historyProviderFilter = 'all';
+let historyWindowFilter: 'all' | '5h' | 'weekly' = 'all';
 
 function esc(str: unknown): string {
   return String(str)
@@ -93,6 +123,9 @@ if (savedState.limitsLayout === 'grid' || savedState.limitsLayout === 'list') {
   limitsLayout = savedState.limitsLayout;
 }
 if (savedState.historyProvider) historyProviderFilter = savedState.historyProvider;
+if (savedState.historyWindow === '5h' || savedState.historyWindow === 'weekly' || savedState.historyWindow === 'all') {
+  historyWindowFilter = savedState.historyWindow;
+}
 
 const applyLimitsLayout = (layout: string): void => {
   limitsLayout = layout === 'grid' ? 'grid' : 'list';
@@ -137,6 +170,17 @@ if (historyProviderSelect) {
   historyProviderSelect.addEventListener('change', () => {
     historyProviderFilter = historyProviderSelect.value || 'all';
     saveViewState({ historyProvider: historyProviderFilter });
+    if (lastPayload) renderBars(lastPayload.history);
+  });
+}
+
+const historyWindowSelect = document.getElementById('historyWindowSelect') as HTMLSelectElement | null;
+if (historyWindowSelect) {
+  historyWindowSelect.value = historyWindowFilter;
+  historyWindowSelect.addEventListener('change', () => {
+    const val = historyWindowSelect.value;
+    historyWindowFilter = val === '5h' || val === 'weekly' ? val : 'all';
+    saveViewState({ historyWindow: historyWindowFilter });
     if (lastPayload) renderBars(lastPayload.history);
   });
 }
@@ -274,6 +318,26 @@ const formatMoney = (amount?: number, currency?: string): string => {
   return sym + safe.toFixed(2);
 };
 
+function getProviderHistoryValue(entry: HistoryEntryPayload['providers'][number], win: 'all' | '5h' | 'weekly'): number | null {
+  if (win === '5h') {
+    if (!Array.isArray(entry.pools)) return null;
+    const vals = entry.pools.map((p) => p.fiveHourPct).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    if (vals.length === 0) return null;
+    return Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
+  }
+  if (win === 'weekly') {
+    if (!Array.isArray(entry.pools)) return null;
+    const vals = entry.pools.map((p) => p.weeklyPct).filter((v): v is number => typeof v === 'number' && Number.isFinite(v));
+    if (vals.length === 0) return null;
+    return Math.round(vals.reduce((s, v) => s + v, 0) / vals.length);
+  }
+  if (Array.isArray(entry.pools)) {
+    const hasNumeric = entry.pools.some((p) => typeof p.remainingPct === 'number');
+    if (!hasNumeric) return null;
+  }
+  return typeof entry.remainingPct === 'number' && Number.isFinite(entry.remainingPct) ? entry.remainingPct : null;
+}
+
 function renderBars(history: HistoryEntryPayload[]): void {
   const barsEl = document.getElementById('barsRow');
   if (!barsEl) return;
@@ -284,10 +348,12 @@ function renderBars(history: HistoryEntryPayload[]): void {
   const filtered = history.filter((pt) => {
     const ms = Date.parse(pt.timestamp);
     if (Number.isFinite(ms) && ms < cutoff) return false;
-    if (historyProviderFilter !== 'all') {
-      return Array.isArray(pt.providers) && pt.providers.some((p) => p.id === historyProviderFilter);
-    }
-    return true;
+    const relevantEntries = Array.isArray(pt.providers)
+      ? (historyProviderFilter === 'all' ? pt.providers : pt.providers.filter((p) => p.id === historyProviderFilter))
+      : [];
+    if (relevantEntries.length === 0) return false;
+    if (historyWindowFilter === 'all') return true;
+    return relevantEntries.some((p) => getProviderHistoryValue(p, historyWindowFilter) !== null);
   });
 
   const maxBars = currentRange === '24H' ? 12 : 14;
@@ -302,7 +368,7 @@ function renderBars(history: HistoryEntryPayload[]): void {
   }
 
   if (pts.length === 0) {
-    barsEl.innerHTML = '<div class="pr-sub">No history recorded in this range.</div>';
+    barsEl.innerHTML = '<div class="pr-sub">No history recorded for this filter.</div>';
     return;
   }
 
@@ -315,10 +381,13 @@ function renderBars(history: HistoryEntryPayload[]): void {
     const entries = Array.isArray(pt.providers)
       ? (historyProviderFilter === 'all' ? pt.providers : pt.providers.filter((p) => p.id === historyProviderFilter))
       : [];
-    const avgRemaining = Math.round(
-      entries.reduce((s, p) => s + p.remainingPct, 0) / Math.max(1, entries.length)
-    );
-    const val = isUsedGlobal ? 100 - avgRemaining : avgRemaining;
+    const numericVals = entries
+      .map((p) => getProviderHistoryValue(p, historyWindowFilter))
+      .filter((v): v is number => v !== null);
+    const avgRemaining = numericVals.length > 0
+      ? Math.round(numericVals.reduce((s, v) => s + v, 0) / numericVals.length)
+      : 0;
+    const val = numericVals.length > 0 ? (isUsedGlobal ? 100 - avgRemaining : avgRemaining) : 0;
     const d = new Date(pt.timestamp);
     const validDate = Number.isFinite(d.getTime());
     const hhmm = validDate
@@ -330,13 +399,25 @@ function renderBars(history: HistoryEntryPayload[]): void {
     const axisLbl = currentRange === '24H' ? hhmm : dateLbl;
     const fullTime = validDate ? (dateLbl + ' ' + hhmm) : hhmm;
     const detail = entries.map((p) => {
-      const pv = isUsedGlobal ? 100 - p.remainingPct : p.remainingPct;
-      return (nameMap.get(p.id) || p.id.toUpperCase()) + ': ' + pv + '%';
-    }).join(' · ');
+      const code = nameMap.get(p.id) || p.id.toUpperCase();
+      const winVal = getProviderHistoryValue(p, historyWindowFilter);
+      if (winVal !== null) {
+        const pv = isUsedGlobal ? 100 - winVal : winVal;
+        const balSuffix = typeof p.balanceAmount === 'number'
+          ? ' (' + formatMoney(p.balanceAmount, p.balanceCurrency) + ')'
+          : '';
+        return code + ': ' + pv + '%' + balSuffix;
+      }
+      if (typeof p.balanceAmount === 'number') {
+        return code + ': ' + formatMoney(p.balanceAmount, p.balanceCurrency);
+      }
+      return '';
+    }).filter(Boolean).join(' · ');
     const showAxisLbl = pts.length <= 8 || idx % 2 === 0 || idx === pts.length - 1;
+    const pctDisplay = numericVals.length > 0 ? String(val) : '--';
 
-    return '<div class="bar-col" data-idx="' + idx + '" data-pct="' + val + '" data-unit="' + unitWord + '" data-time="' + esc(fullTime) + '" data-detail="' + esc(detail) + '">' +
-      '<div class="bar-cap"><div class="bar-fill" style="height:' + Math.max(3, val) + '%"></div></div>' +
+    return '<div class="bar-col" data-idx="' + idx + '" data-pct="' + pctDisplay + '" data-unit="' + unitWord + '" data-time="' + esc(fullTime) + '" data-detail="' + esc(detail) + '">' +
+      '<div class="bar-cap"><div class="bar-fill" style="height:' + (numericVals.length > 0 ? Math.max(3, val) : 12) + '%"></div></div>' +
       '<span class="bar-label">' + (showAxisLbl ? esc(axisLbl) : '') + '</span>' +
     '</div>';
   }).join('');
@@ -346,7 +427,12 @@ function renderBars(history: HistoryEntryPayload[]): void {
       const popPct = document.getElementById('popPct');
       const popDesc = document.getElementById('popDesc');
       const popDetail = document.getElementById('popDetail');
-      if (popPct) popPct.textContent = col.getAttribute('data-pct') + '% ' + (col.getAttribute('data-unit') || 'left');
+      const rawPct = col.getAttribute('data-pct') || '--';
+      if (popPct) {
+        popPct.textContent = rawPct === '--'
+          ? 'Balance snapshot'
+          : (rawPct + '% ' + (col.getAttribute('data-unit') || 'left'));
+      }
       if (popDesc) popDesc.textContent = 'Snapshot at ' + col.getAttribute('data-time');
       if (popDetail) popDetail.textContent = col.getAttribute('data-detail') || '';
       document.getElementById('chartPopover')?.classList.add('visible');
@@ -363,6 +449,9 @@ function renderAll(): void {
     return isUsedGlobal ? 100 - clamped : clamped;
   };
   const activeSb = getActiveSbSet(config);
+  const lowPct = typeof config?.lowThresholdPct === 'number' ? config.lowThresholdPct : 20;
+  const medPct = Math.min(85, Math.max(lowPct + 10, Math.round(lowPct * 2.5)));
+  const lowBal = typeof config?.lowBalanceUsd === 'number' ? config.lowBalanceUsd : 1;
 
   const visibleSnapshots = snapshots.filter((s) => s.status !== 'not_connected');
 
@@ -424,10 +513,10 @@ function renderAll(): void {
   }
 
   const lowCount = allLivePools.filter((p) =>
-    (typeof p.remainingPct === 'number' && p.remainingPct <= 20) ||
-    (typeof p.fiveHourPct === 'number' && p.fiveHourPct <= 20) ||
-    (typeof p.weeklyPct === 'number' && p.weeklyPct <= 20) ||
-    (typeof p.remainingPct !== 'number' && typeof p.balanceAmount === 'number' && p.balanceAmount <= 1)
+    (typeof p.remainingPct === 'number' && p.remainingPct <= lowPct) ||
+    (typeof p.fiveHourPct === 'number' && p.fiveHourPct <= lowPct) ||
+    (typeof p.weeklyPct === 'number' && p.weeklyPct <= lowPct) ||
+    (typeof p.remainingPct !== 'number' && typeof p.balanceAmount === 'number' && p.balanceAmount <= lowBal)
   ).length;
   const pinnedCount = allLivePools.filter((p) => {
     const sbKey = getStatusBarKey(p.providerId, p.id);
@@ -470,8 +559,8 @@ function renderAll(): void {
 
   const getQuotaTone = (remainingPct: unknown): string => {
     if (typeof remainingPct !== 'number' || !Number.isFinite(remainingPct)) return '';
-    if (remainingPct <= 20) return 'tone-low';
-    if (remainingPct <= 50) return 'tone-medium';
+    if (remainingPct <= lowPct) return 'tone-low';
+    if (remainingPct <= medPct) return 'tone-medium';
     return 'tone-healthy';
   };
 
@@ -508,7 +597,7 @@ function renderAll(): void {
       : (hasBal ? formatMoney(pl.balanceAmount, pl.balanceCurrency) : '--');
     const sbKey = getStatusBarKey(s.id, pl.id);
     const sbSwitchHtml = renderSbSwitch(sbKey, pl, s.shortCode);
-    const isWarn = hasPct ? (pl.remainingPct! <= 20) : (hasBal && pl.balanceAmount! <= 1);
+    const isWarn = hasPct ? (pl.remainingPct! <= lowPct) : (hasBal && pl.balanceAmount! <= lowBal);
     const poolTone = hasPct ? getQuotaTone(pl.remainingPct) : (isWarn ? 'tone-low' : '');
 
     const hasFiveH = typeof pl.fiveHourPct === 'number';
@@ -516,7 +605,7 @@ function renderAll(): void {
     const primaryRem = (hasFiveH && hasWeekly) ? pl.fiveHourPct : pl.remainingPct;
     const primaryFillVal = typeof primaryRem === 'number' ? fmtVal(primaryRem) : barVal;
     const primaryTone = typeof primaryRem === 'number' ? getQuotaTone(primaryRem) : poolTone;
-    const primaryWarn = typeof primaryRem === 'number' ? (primaryRem <= 20) : isWarn;
+    const primaryWarn = typeof primaryRem === 'number' ? (primaryRem <= lowPct) : isWarn;
 
     const metaParts: string[] = [];
     if (pl.weeklyPct === 0 && hasFiveH && pl.fiveHourPct! > 0) {
@@ -541,6 +630,7 @@ function renderAll(): void {
     if (hasBal) tooltipParts.push('Balance: ' + formatMoney(pl.balanceAmount, pl.balanceCurrency));
     if (pl.fiveHourReset) tooltipParts.push('5h reset: ' + pl.fiveHourReset);
     if (pl.weeklyReset) tooltipParts.push('Weekly reset: ' + pl.weeklyReset);
+    if (pl.pacing && pl.pacing.detail) tooltipParts.push('Pace: ' + pl.pacing.detail);
 
     const providerPill = isFlat
       ? '<span class="provider-code-pill" title="' + esc(s.name) + '">' + esc(s.shortCode) + '</span>'
@@ -550,7 +640,12 @@ function renderAll(): void {
       ? '<div class="q-track"><div class="q-fill ' + primaryTone + (primaryWarn ? ' warn' : '') + '" style="width:' + primaryFillVal + '%"></div></div>'
       : '';
     const donutHtml = renderWeeklyDonut(pl);
-    const metaHtml = metaParts.length > 0 ? '<div class="pool-meta">' + esc(metaParts.join(' · ')) + '</div>' : '';
+    const pacingBadgeHtml = pl.pacing
+      ? '<span class="pacing-badge ' + esc(pl.pacing.level) + '" title="' + esc(pl.pacing.detail) + '">' + esc(pl.pacing.label) + '</span>'
+      : '';
+    const metaHtml = (metaParts.length > 0 || pacingBadgeHtml)
+      ? '<div class="pool-meta">' + (metaParts.length > 0 ? '<span>' + esc(metaParts.join(' · ')) + '</span>' : '') + pacingBadgeHtml + '</div>'
+      : '';
 
     return '<div class="pool-item' + (isFlat ? ' flat-pool' : '') + '" title="' + esc(tooltipParts.join(' | ')) + '">' +
       '<div class="pool-head">' +
@@ -569,10 +664,10 @@ function renderAll(): void {
 
   const poolMatchesFilter = (s: SnapshotPayload, pl: PoolPayload): boolean => {
     if (activeStatusFilter === 'low') {
-      return (typeof pl.remainingPct === 'number' && pl.remainingPct <= 20) ||
-        (typeof pl.fiveHourPct === 'number' && pl.fiveHourPct <= 20) ||
-        (typeof pl.weeklyPct === 'number' && pl.weeklyPct <= 20) ||
-        (typeof pl.remainingPct !== 'number' && typeof pl.balanceAmount === 'number' && pl.balanceAmount <= 1);
+      return (typeof pl.remainingPct === 'number' && pl.remainingPct <= lowPct) ||
+        (typeof pl.fiveHourPct === 'number' && pl.fiveHourPct <= lowPct) ||
+        (typeof pl.weeklyPct === 'number' && pl.weeklyPct <= lowPct) ||
+        (typeof pl.remainingPct !== 'number' && typeof pl.balanceAmount === 'number' && pl.balanceAmount <= lowBal);
     }
     if (activeStatusFilter === 'pinned') {
       const sbKey = getStatusBarKey(s.id, pl.id);
@@ -632,10 +727,10 @@ function renderAll(): void {
       if (numericPools.length > 0) {
         const avg = Math.round(numericPools.reduce((sum, pl) => sum + (pl.remainingPct ?? 0), 0) / numericPools.length);
         headVal = fmtVal(avg) + (isUsedGlobal ? '% used' : '%');
-        headWarn = ' ' + getQuotaTone(avg) + (avg <= 20 ? ' warn' : '');
+        headWarn = ' ' + getQuotaTone(avg) + (avg <= lowPct ? ' warn' : '');
       } else if (typeof matchedPools[0].balanceAmount === 'number') {
         headVal = formatMoney(matchedPools[0].balanceAmount, matchedPools[0].balanceCurrency);
-        headWarn = matchedPools[0].balanceAmount <= 1 ? ' tone-low warn' : ' tone-healthy';
+        headWarn = matchedPools[0].balanceAmount <= lowBal ? ' tone-low warn' : ' tone-healthy';
       }
 
       const isBusyDisconnect = Boolean(pendingAction && pendingAction.type === 'disconnect' && pendingAction.providerId === p.id);

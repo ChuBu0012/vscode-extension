@@ -2,6 +2,22 @@ import { BudgetConfig, CustomProviderConfig } from './types';
 
 export const MIN_POLLING_SECONDS = 30;
 export const MAX_POLLING_SECONDS = 3600;
+export const DEFAULT_LOW_THRESHOLD_PCT = 20;
+export const DEFAULT_LOW_BALANCE_USD = 1;
+
+export function sanitizeLowThresholdPct(value: unknown, fallback = DEFAULT_LOW_THRESHOLD_PCT): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(1, Math.min(90, Math.round(value)));
+}
+
+export function sanitizeLowBalanceUsd(value: unknown, fallback = DEFAULT_LOW_BALANCE_USD): number {
+  if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
+    return fallback;
+  }
+  return Math.round(value * 100) / 100;
+}
 
 export function sanitizePollingInterval(value: unknown, fallback = 300): number {
   if (typeof value !== 'number' || !Number.isFinite(value)) {
